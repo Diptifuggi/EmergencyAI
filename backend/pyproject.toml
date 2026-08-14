@@ -1,0 +1,8 @@
+[project]
+name = "emergencyiq-backend"
+version = "0.1.0"
+description = "EmergencyIQ backend: FastAPI service for emergency call prioritization"
+requires-python = ">=3.11"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.0"

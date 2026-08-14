@@ -1,0 +1,1 @@
+list of jsx files to delete
