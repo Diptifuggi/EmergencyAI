@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --bg:#0A0A0A;
+  --sidebar:#111111;
+  --card:#171717;
+  --border:#262626;
+  --text-primary:#FFFFFF;
+  --text-secondary:#A1A1AA;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+.dark-sidebar{ background:var(--sidebar); }
+.card{ background:var(--card); border:1px solid var(--border); }
+.muted{ color:var(--text-secondary); }
+

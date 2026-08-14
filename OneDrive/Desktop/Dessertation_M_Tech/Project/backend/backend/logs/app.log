@@ -1,0 +1,438 @@
+2026-06-22 12:30:36 | ERROR | app.main | Database connection failed: password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\app\main.py", line 32, in startup_event
+    async with engine.connect() as conn:
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\base.py", line 121, in __aenter__
+    return await self.start(is_ctxmanager=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\engine.py", line 273, in start
+    await greenlet_spawn(self.sync_engine.connect)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3276, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3300, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 179, in _do_get
+    with util.safe_reraise():
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 643, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 620, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 937, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 131, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 2329, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 991, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 828, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 876, in __connect_addr
+    await connected
+asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "postgres"
+2026-06-22 12:30:36 | INFO | app.main | Startup complete in 0.15 seconds
+2026-06-22 12:30:36 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-06-22 12:30:36 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-06-22 12:39:40 | INFO | app.main | Shutting down gracefully
+2026-06-22 12:41:43 | ERROR | app.main | Database connection failed: password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\app\main.py", line 32, in startup_event
+    async with engine.connect() as conn:
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\base.py", line 121, in __aenter__
+    return await self.start(is_ctxmanager=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\engine.py", line 273, in start
+    await greenlet_spawn(self.sync_engine.connect)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3276, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3300, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 179, in _do_get
+    with util.safe_reraise():
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 643, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 620, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 937, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 131, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 2329, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 991, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 828, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 876, in __connect_addr
+    await connected
+asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "postgres"
+2026-06-22 12:41:43 | INFO | app.main | Startup complete in 0.18 seconds
+2026-06-22 12:41:43 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-06-22 12:41:43 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-08 10:15:10 | ERROR | app.main | Database connection failed: password authentication failed for user "postgres"
+Traceback (most recent call last):
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\app\main.py", line 32, in startup_event
+    async with engine.connect() as conn:
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\base.py", line 121, in __aenter__
+    return await self.start(is_ctxmanager=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\ext\asyncio\engine.py", line 273, in start
+    await greenlet_spawn(self.sync_engine.connect)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3276, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 146, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3300, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 449, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1263, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 712, in checkout
+    rec = pool._do_get()
+          ^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 179, in _do_get
+    with util.safe_reraise():
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    return self._create_connection()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 390, in _create_connection
+    return _ConnectionRecord(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 674, in __init__
+    self.__connect()
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\create.py", line 643, in connect
+    return dialect.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 620, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 937, in connect
+    await_only(creator_fn(*arg, **kw)),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 131, in await_only
+    return current.driver.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 2329, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 991, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 828, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\backend\.venv\Lib\site-packages\asyncpg\connect_utils.py", line 876, in __connect_addr
+    await connected
+asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "postgres"
+2026-08-08 10:15:10 | INFO | app.main | Startup complete in 0.19 seconds
+2026-08-08 10:15:10 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-08 10:15:10 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-08 11:10:58 | INFO | app.main | Shutting down gracefully
+2026-08-11 16:37:03 | INFO | app.main | Database connection verified
+2026-08-11 16:37:03 | INFO | app.main | Startup complete in 0.12 seconds
+2026-08-11 16:37:03 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-11 16:37:03 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 08:57:53 | INFO | app.main | Database connection verified
+2026-08-12 08:57:53 | INFO | app.main | Startup complete in 0.25 seconds
+2026-08-12 08:57:53 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 08:57:53 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 09:34:22 | INFO | app.main | Shutting down gracefully
+2026-08-12 09:34:27 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:34:27 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 09:34:27 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 09:34:27 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:34:32 | INFO | app.main | Database connection verified
+2026-08-12 09:34:32 | INFO | app.main | Startup complete in 0.24 seconds
+2026-08-12 09:34:32 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 09:34:32 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 09:34:55 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:34:55 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 09:34:55 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 09:34:55 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:40:41 | INFO | app.main | Shutting down gracefully
+2026-08-12 09:40:53 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:40:53 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 09:40:53 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 09:40:53 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:40:55 | INFO | app.main | Database connection verified
+2026-08-12 09:40:55 | INFO | app.main | Startup complete in 0.17 seconds
+2026-08-12 09:40:55 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 09:40:55 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 09:41:23 | WARNING | app.services.ollama_client | Ollama HTTP error: All connection attempts failed
+2026-08-12 09:41:23 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:41:26 | WARNING | app.services.ollama_client | Ollama HTTP error: All connection attempts failed
+2026-08-12 09:41:26 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:41:29 | WARNING | app.services.ollama_client | Ollama HTTP error: All connection attempts failed
+2026-08-12 09:41:29 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 09:41:33 | WARNING | app.services.ollama_client | Ollama HTTP error: All connection attempts failed
+2026-08-12 09:41:33 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 10:29:32 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 10:29:39 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 10:31:05 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 10:31:05 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 10:31:05 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 10:31:05 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 10:31:36 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 10:32:06 | INFO | app.main | Shutting down gracefully
+2026-08-12 10:32:16 | INFO | app.main | Database connection verified
+2026-08-12 10:32:16 | INFO | app.main | Startup complete in 0.29 seconds
+2026-08-12 10:32:16 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 10:32:16 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 10:36:33 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 10:36:33 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 10:36:33 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 10:36:33 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 10:37:10 | INFO | app.main | Shutting down gracefully
+2026-08-12 10:37:19 | INFO | app.main | Database connection verified
+2026-08-12 10:37:19 | INFO | app.main | Startup complete in 0.24 seconds
+2026-08-12 10:37:19 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 10:37:19 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 11:11:49 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 11:11:49 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 11:11:50 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 11:11:50 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 11:25:54 | INFO | app.main | Database connection verified
+2026-08-12 11:25:54 | INFO | app.main | Startup complete in 0.43 seconds
+2026-08-12 11:25:54 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 11:25:54 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 12:34:17 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 12:34:17 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM returned malformed JSON
+2026-08-12 12:34:17 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-12 12:34:17 | WARNING | app.services.emergency_analysis_service | Ollama unavailable during analysis: Ollama backend is unavailable
+2026-08-12 12:35:10 | INFO | app.main | Shutting down gracefully
+2026-08-12 12:35:18 | INFO | app.main | Database connection verified
+2026-08-12 12:35:18 | INFO | app.main | Startup complete in 0.17 seconds
+2026-08-12 12:35:18 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 12:35:18 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 12:41:19 | INFO | app.main | Shutting down gracefully
+2026-08-12 12:41:31 | INFO | app.main | Shutting down gracefully
+2026-08-12 13:19:24 | INFO | app.main | Database connection verified
+2026-08-12 13:19:24 | INFO | app.main | Startup complete in 0.39 seconds
+2026-08-12 13:19:24 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 13:19:24 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-12 16:22:03 | INFO | app.main | Database connection verified
+2026-08-12 16:22:03 | INFO | app.main | Startup complete in 0.19 seconds
+2026-08-12 16:22:03 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-12 16:22:03 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:17:56 | INFO | app.main | Database connection verified
+2026-08-14 10:17:56 | INFO | app.main | Startup complete in 0.27 seconds
+2026-08-14 10:17:56 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-14 10:17:56 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:25:28 | INFO | app.main | Shutting down gracefully
+2026-08-14 10:26:06 | INFO | app.main | Database connection verified
+2026-08-14 10:26:06 | INFO | app.main | Startup complete in 0.63 seconds
+2026-08-14 10:26:06 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-14 10:26:06 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:32:43 | WARNING | app.services.emergency_analysis_service | Analysis validation failed: LLM analysis contains invalid enum or field values
+2026-08-14 10:48:29 | INFO | app.main | Shutting down gracefully
+2026-08-14 10:48:36 | INFO | app.main | Database connection verified
+2026-08-14 10:48:36 | INFO | app.main | Startup complete in 0.16 seconds
+2026-08-14 10:48:36 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-14 10:48:36 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:49:06 | INFO | app.main | Shutting down gracefully
+2026-08-14 10:49:12 | INFO | app.main | Database connection verified
+2026-08-14 10:49:12 | INFO | app.main | Startup complete in 0.25 seconds
+2026-08-14 10:49:12 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-14 10:49:12 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:49:42 | INFO | app.main | Shutting down gracefully
+2026-08-14 10:49:46 | INFO | app.main | Database connection verified
+2026-08-14 10:49:46 | INFO | app.main | Startup complete in 0.19 seconds
+2026-08-14 10:49:46 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-14 10:49:46 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:54:03 | ERROR | app.api.v1.emergency_calls | Failed to convert audio test_emergency_audio.m4a to MP3: ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.100 / 61. 19.100
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0000024083cc5280] Format mov,mp4,m4a,3gp,3g2,mj2 detected only with low score of 1, misdetection possible!
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0000024083cc5280] moov atom not found
+[in#0 @ 0000024083cc4f00] Error opening input: Invalid data found when processing input
+Error opening input file C:\Users\USER\AppData\Local\Temp\tmpb25k030o.m4a.
+Error opening input files: Invalid data found when processing input
+NoneType: None
+2026-08-14 10:54:04 | ERROR | app.api.v1.emergency_calls | Failed to convert audio voice.m4a to MP3: ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.100 / 61. 19.100
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001fd0b6a5280] Format mov,mp4,m4a,3gp,3g2,mj2 detected only with low score of 1, misdetection possible!
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001fd0b6a5280] moov atom not found
+[in#0 @ 000001fd0b6a4f00] Error opening input: Invalid data found when processing input
+Error opening input file C:\Users\USER\AppData\Local\Temp\tmp_v3qm8f7.m4a.
+Error opening input files: Invalid data found when processing input
+NoneType: None
+2026-08-14 10:54:42 | INFO | app.main | Shutting down gracefully
+2026-08-14 10:54:49 | INFO | app.main | Database connection verified
+2026-08-14 10:54:49 | INFO | app.main | Startup complete in 0.16 seconds
+2026-08-14 10:54:49 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-14 10:54:49 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-14 10:54:55 | WARNING | app.api.v1.emergency_calls | Audio conversion fallback activated for test_emergency_audio.m4a: ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.100 / 61. 19.100
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000002b123c95280] Format mov,mp4,m4a,3gp,3g2,mj2 detected only with low score of 1, misdetection possible!
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000002b123c95280] moov atom not found
+[in#0 @ 000002b123c94f00] Error opening input: Invalid data found when processing input
+Error opening input file C:\Users\USER\AppData\Local\Temp\tmp_2p9pfce.m4a.
+Error opening input files: Invalid data found when processing input
+2026-08-14 10:54:55 | WARNING | app.api.v1.emergency_calls | Audio conversion fallback activated for voice.m4a: ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.100 / 61. 19.100
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001a32da55280] Format mov,mp4,m4a,3gp,3g2,mj2 detected only with low score of 1, misdetection possible!
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001a32da55280] moov atom not found
+[in#0 @ 000001a32da54f00] Error opening input: Invalid data found when processing input
+Error opening input file C:\Users\USER\AppData\Local\Temp\tmpwtygfy60.m4a.
+Error opening input files: Invalid data found when processing input
+2026-08-14 11:06:52 | WARNING | app.api.v1.emergency_calls | Audio conversion fallback activated for fdde60b182c948b9bb24502673665874.m4a: ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  built with gcc 14.2.0 (Rev1, Built by MSYS2 project)
+  configuration: --enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband
+  libavutil      59. 39.100 / 59. 39.100
+  libavcodec     61. 19.100 / 61. 19.100
+  libavformat    61.  7.100 / 61.  7.100
+  libavdevice    61.  3.100 / 61.  3.100
+  libavfilter    10.  4.100 / 10.  4.100
+  libswscale      8.  3.100 /  8.  3.100
+  libswresample   5.  3.100 /  5.  3.100
+  libpostproc    58.  3.100 / 58.  3.100
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001ca9d137bc0] Format mov,mp4,m4a,3gp,3g2,mj2 detected only with low score of 1, misdetection possible!
+[mov,mp4,m4a,3gp,3g2,mj2 @ 000001ca9d137bc0] moov atom not found
+[in#0 @ 000001ca9d1377c0] Error opening input: Invalid data found when processing input
+Error opening input file C:\Users\USER\AppData\Local\Temp\tmpcp22_wvo.m4a.
+Error opening input files: Invalid data found when processing input
+2026-08-14 11:12:08 | INFO | app.main | Shutting down gracefully
