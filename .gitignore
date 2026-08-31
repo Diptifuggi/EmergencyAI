@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Secrets and local configuration
 .env
 **/.env
@@ -9,12 +10,19 @@ backend/.venv/
 __pycache__/
 **/__pycache__/
 *.pyc
+=======
+# Python
+__pycache__/
+*.pyc
+.env
+>>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
 
 # Node
 node_modules/
 dist/
 
 # Vite
+<<<<<<< HEAD
 .vite/
 
 # VSCode
@@ -30,3 +38,9 @@ postgres-data/
 **/postgres-data/
 map-tiles/
 **/map-tiles/
+=======
+/.vite
+
+# VSCode
+.vscode/
+>>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
