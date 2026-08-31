@@ -51,6 +51,11 @@ class EmergencyCall(Base):
     client_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_timestamp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    location_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

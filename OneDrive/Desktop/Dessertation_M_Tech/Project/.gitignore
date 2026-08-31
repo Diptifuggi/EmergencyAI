@@ -1,0 +1,15 @@
+# Secrets and local configuration
+.env
+**/.env
+!.env.example
+
+# OSM/Nominatim imports and generated map data
+osm-data/
+**/osm-data/
+*.osm.pbf
+nominatim-data/
+**/nominatim-data/
+postgres-data/
+**/postgres-data/
+map-tiles/
+**/map-tiles/

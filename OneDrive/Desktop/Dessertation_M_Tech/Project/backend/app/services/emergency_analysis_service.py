@@ -18,15 +18,16 @@ from ..schemas.emergency_analysis import (
     SUPPORTED_LANGUAGES,
     _RawEmergencyAnalysis,
 )
-from .analysis_normalizers import (
-    enrich_help_required,
-    normalize_analysis_level,
-    normalize_dispatch_units,
-    normalize_emergency_type,
-    normalize_help_required_list,
-    priority_level_to_db_value,
-)
+from .analysis_normalizers import normalize_emergency_type
 from .ollama_client import OllamaClient
+from .scoring_policy import (
+    calculate_priority_score,
+    calculate_help_required,
+    clamp_score,
+    level_for_score,
+    calculate_severity_score,
+    recommended_units_for_help,
+)
 
 logger = get_logger("app.services.emergency_analysis_service")
 
@@ -36,6 +37,9 @@ Analyze ONLY the supplied emergency transcript text. Do not invent facts not pre
 Return JSON ONLY with exactly these keys (no extra keys):
 {
   "emergency_type": "<one category>",
+  "severity": "<LOW|MEDIUM|HIGH|CRITICAL>",
+  "immediate_threat": <true|false>,
+  "people_at_risk": <non-negative integer>,
   "help_required": ["<zero or more help values>"],
   "emergency_keywords": ["<meaningful emergency phrases only>"],
   "priority_score": <integer 0-100>,
@@ -66,9 +70,12 @@ police, fire, ambulance, or other specific help needs.
 dispatch_recommendation.recommended_units should use short unit names such as:
 police, ambulance, fire_service, rescue, medical_assistance, women_safety_support, child_protection
 
-Scoring rules (0-100, explainable from transcript cues only):
-- priority_score: immediate danger, serious injury, violence, weapon, fire, unconsciousness,
-  trapped person, child in danger, active threat, urgent requests for emergency help.
+Extract severity, immediate_threat and people_at_risk from evidence in the transcript.
+The backend, not this model, calculates final priority_score and priority_level.
+- severity: LOW, MEDIUM, HIGH or CRITICAL evidence assessment.
+- immediate_threat: true only for an active/immediate danger.
+- people_at_risk: number directly supported by the transcript; use 0 if unknown.
+- priority_score and priority_level are legacy fields and are ignored by the backend.
 - panic_score: textual distress only (e.g. "help", "save me", "scared", repeated urgency).
   NOT clinical diagnosis. NOT acoustic voice analysis.
 - stress_score: transcript-based tension/urgency language only. NOT clinical diagnosis.
@@ -161,30 +168,35 @@ class EmergencyAnalysisService:
             ) from exc
 
         try:
-            dispatch_raw = raw.dispatch_recommendation or {}
-            units_raw = dispatch_raw.get("recommended_units", [])
-            if not isinstance(units_raw, list):
-                units_raw = []
-            dispatch_units = normalize_dispatch_units([str(unit) for unit in units_raw])
-
             emergency_type = normalize_emergency_type(raw.emergency_type)
-            help_required = enrich_help_required(
-                help_required=normalize_help_required_list(raw.help_required),
-                emergency_type=emergency_type,
-                transcript=transcript,
-                dispatch_units=dispatch_units,
+            help_required = calculate_help_required(
+                emergency_type=emergency_type, transcript=transcript
             )
+            dispatch_units = recommended_units_for_help(help_required)
+            priority_score = calculate_priority_score(
+                emergency_type=emergency_type,
+                immediate_threat=raw.immediate_threat,
+                people_at_risk=raw.people_at_risk,
+                transcript=transcript,
+            )
+            # These remain model-extracted textual indicators, but are bounded
+            # and categorised by backend policy rather than LLM labels.
+            panic_score = clamp_score(raw.panic_score)
+            stress_score = clamp_score(raw.stress_score)
 
             return EmergencyAnalysis(
                 emergency_type=emergency_type,
+                severity=level_for_score(
+                    calculate_severity_score(emergency_type=emergency_type, transcript=transcript)
+                ),
                 help_required=help_required,
                 emergency_keywords=raw.emergency_keywords,
-                priority_score=raw.priority_score,
-                priority_level=normalize_analysis_level(raw.priority_level),
-                panic_score=raw.panic_score,
-                panic_level=normalize_analysis_level(raw.panic_level),
-                stress_score=raw.stress_score,
-                stress_level=normalize_analysis_level(raw.stress_level),
+                priority_score=priority_score,
+                priority_level=level_for_score(priority_score),
+                panic_score=panic_score,
+                panic_level=level_for_score(panic_score),
+                stress_score=stress_score,
+                stress_level=level_for_score(stress_score),
                 dispatch_recommendation={
                     "recommended_units": dispatch_units,
                 },

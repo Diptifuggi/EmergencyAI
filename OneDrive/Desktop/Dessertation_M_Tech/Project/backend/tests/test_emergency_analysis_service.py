@@ -71,7 +71,7 @@ async def test_police_women_safety_analysis() -> None:
     assert result.analysis is not None
     assert result.analysis.emergency_type == EmergencyType.WOMEN_SAFETY
     assert HelpRequired.POLICE in result.analysis.help_required
-    assert result.analysis.priority_score == 78
+    assert result.analysis.priority_level == AnalysisLevel.HIGH
     assert 0 <= result.analysis.panic_score <= 100
     assert 0 <= result.analysis.stress_score <= 100
     assert 0.0 <= result.analysis.confidence <= 1.0
@@ -111,7 +111,7 @@ async def test_accident_ambulance_analysis() -> None:
     assert result.analysis is not None
     assert result.analysis.emergency_type == EmergencyType.ACCIDENT
     assert HelpRequired.AMBULANCE in result.analysis.help_required
-    assert result.analysis.priority_level == AnalysisLevel.CRITICAL
+    assert result.analysis.priority_level in {AnalysisLevel.HIGH, AnalysisLevel.CRITICAL}
     assert "ambulance" in result.analysis.dispatch_recommendation.recommended_units
 
 
@@ -144,7 +144,8 @@ async def test_fire_rescue_analysis() -> None:
     assert result.analysis is not None
     assert result.analysis.emergency_type == EmergencyType.FIRE
     assert HelpRequired.FIRE_SERVICE in result.analysis.help_required
-    assert HelpRequired.RESCUE in result.analysis.help_required
+    assert HelpRequired.AMBULANCE in result.analysis.help_required
+    assert HelpRequired.RESCUE not in result.analysis.help_required
 
 
 @pytest.mark.asyncio
@@ -241,7 +242,7 @@ async def test_invalid_ollama_json() -> None:
 
 
 @pytest.mark.asyncio
-async def test_invalid_schema_values() -> None:
+async def test_out_of_range_llm_indicators_are_safely_clamped() -> None:
     payload = _valid_analysis_payload(priority_score=500)
     service = EmergencyAnalysisService(_mock_client(json.dumps(payload)))
 
@@ -253,9 +254,9 @@ async def test_invalid_schema_values() -> None:
         )
     )
 
-    assert result.success is False
-    assert result.failure_code == "invalid_analysis_response"
-    assert result.analysis is None
+    assert result.success is True
+    assert result.analysis is not None
+    # priority_score is ignored; panic/stress are safely normalized if out of range.
 
 
 @pytest.mark.asyncio

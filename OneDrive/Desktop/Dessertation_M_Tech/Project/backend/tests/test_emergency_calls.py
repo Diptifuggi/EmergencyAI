@@ -23,6 +23,8 @@ def emergency_text_payload() -> dict:
         "language": "en",
         "latitude": 22.5645,
         "longitude": 72.9289,
+        "location_accuracy": 8.5,
+        "location_timestamp": "2026-08-27T10:30:00Z",
     }
 
 
@@ -42,7 +44,11 @@ def mock_successful_analysis():
 async def test_create_text_emergency(async_client: AsyncClient) -> None:
     payload = emergency_text_payload()
 
-    response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+    with patch(
+        "app.api.v1.emergency_calls.reverse_geocode",
+        new=AsyncMock(return_value="Anand, Gujarat, India"),
+    ):
+        response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
 
     assert response.status_code == 201
     data = response.json()
@@ -50,6 +56,11 @@ async def test_create_text_emergency(async_client: AsyncClient) -> None:
     assert data["text_content"] == payload["text"]
     assert data["language"] == payload["language"]
     assert data["call_type"] == "text"
+    assert data["latitude"] == payload["latitude"]
+    assert data["longitude"] == payload["longitude"]
+    assert data["location_accuracy"] == payload["location_accuracy"]
+    assert data["location_timestamp"].startswith("2026-08-27T10:30:00")
+    assert data["location_address"] == "Anand, Gujarat, India"
     assert "emergency_analysis" in data["client_metadata"]
     assert uuid.UUID(data["id"])
 
@@ -150,6 +161,24 @@ async def test_create_text_emergency_empty_text(async_client: AsyncClient) -> No
 
 
 @pytest.mark.asyncio
+async def test_create_text_emergency_succeeds_when_geocoder_is_down(
+    async_client: AsyncClient,
+) -> None:
+    payload = emergency_text_payload()
+    with patch(
+        "app.api.v1.emergency_calls.reverse_geocode",
+        new=AsyncMock(return_value=None),
+    ):
+        response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["latitude"] == payload["latitude"]
+    assert data["longitude"] == payload["longitude"]
+    assert data["location_address"] is None
+
+
+@pytest.mark.asyncio
 async def test_list_emergency_calls_envelope(async_client: AsyncClient) -> None:
     response = await async_client.get("/api/v1/emergency-calls/")
     assert response.status_code == 200
@@ -157,3 +186,44 @@ async def test_list_emergency_calls_envelope(async_client: AsyncClient) -> None:
     assert "items" in body
     assert "total" in body
     assert body["api_version"] == "v1"
+
+
+def test_convert_uploaded_audio_to_mp3_real_or_mocked_ffmpeg() -> None:
+    from app.api.v1.emergency_calls import convert_uploaded_audio_to_mp3
+    import subprocess
+    from unittest.mock import MagicMock
+
+    # We mock subprocess.run to verify how it gets called and that it receives files
+    # that are not locked.
+    called_args = []
+
+    def mock_subprocess_run(args, **kwargs):
+        called_args.append(args)
+        # Check if the temporary source and output file paths exist
+        source_file_path = args[3]
+        dest_file_path = args[13]
+        
+        # Verify that we can write to the dest path or check they exist
+        assert Path(source_file_path).exists()
+        assert Path(dest_file_path).exists()
+        
+        # Write some fake output to destination to simulate successful conversion
+        Path(dest_file_path).write_bytes(b"mocked-converted-mp3-bytes")
+        
+        # Return completed process with returncode 0
+        mock_res = MagicMock()
+        mock_res.returncode = 0
+        return mock_res
+
+    with patch("subprocess.run", side_effect=mock_subprocess_run):
+        # We also mock _resolve_ffmpeg_path to ensure it returns a dummy path if none is present
+        with patch("app.api.v1.emergency_calls._resolve_ffmpeg_path", return_value="dummy_ffmpeg"):
+            res_bytes, res_ext, res_mime = convert_uploaded_audio_to_mp3(
+                b"fake-original-audio-bytes", "test_file.mp4"
+            )
+            assert res_bytes == b"mocked-converted-mp3-bytes"
+            assert res_ext == ".mp3"
+            assert res_mime == "audio/mpeg"
+
+    assert len(called_args) == 1
+

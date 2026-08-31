@@ -24,6 +24,8 @@ class EmergencyApiService {
     required String language,
     double? latitude,
     double? longitude,
+    double? locationAccuracy,
+    DateTime? locationTimestamp,
     Map<String, dynamic>? clientMetadata,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
@@ -39,6 +41,8 @@ class EmergencyApiService {
         'language': _validatedLanguage(language),
         'latitude': latitude,
         'longitude': longitude,
+        'location_accuracy': locationAccuracy,
+        'location_timestamp': locationTimestamp?.toUtc().toIso8601String(),
         'source': 'flutter',
         if (clientMetadata != null) 'client_metadata': clientMetadata,
       }),
@@ -67,6 +71,8 @@ class EmergencyApiService {
     required String language,
     double? latitude,
     double? longitude,
+    double? locationAccuracy,
+    DateTime? locationTimestamp,
     Map<String, dynamic>? clientMetadata,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
@@ -82,6 +88,12 @@ class EmergencyApiService {
     }
     if (longitude != null) {
       request.fields['longitude'] = longitude.toString();
+    }
+    if (locationAccuracy != null) {
+      request.fields['location_accuracy'] = locationAccuracy.toString();
+    }
+    if (locationTimestamp != null) {
+      request.fields['location_timestamp'] = locationTimestamp.toUtc().toIso8601String();
     }
     if (clientMetadata != null) {
       request.fields['client_metadata'] = jsonEncode(clientMetadata);
@@ -121,6 +133,8 @@ class EmergencyApiService {
     String? transcription,
     double? latitude,
     double? longitude,
+    double? locationAccuracy,
+    DateTime? locationTimestamp,
     Map<String, dynamic>? clientMetadata,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
@@ -137,6 +151,12 @@ class EmergencyApiService {
     }
     if (longitude != null) {
       request.fields['longitude'] = longitude.toString();
+    }
+    if (locationAccuracy != null) {
+      request.fields['location_accuracy'] = locationAccuracy.toString();
+    }
+    if (locationTimestamp != null) {
+      request.fields['location_timestamp'] = locationTimestamp.toUtc().toIso8601String();
     }
     if (clientMetadata != null) {
       request.fields['client_metadata'] = jsonEncode(clientMetadata);

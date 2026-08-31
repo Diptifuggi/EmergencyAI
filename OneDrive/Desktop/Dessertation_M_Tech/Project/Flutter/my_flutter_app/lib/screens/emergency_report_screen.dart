@@ -14,8 +14,11 @@ import '../core/language/emergency_language_option.dart';
 import '../core/language/language_mapper.dart';
 import '../core/network/api_client.dart';
 import '../models/emergency_call.dart';
+import '../models/emergency_location.dart';
 import '../services/emergency_api_service.dart';
+import '../services/location_service.dart';
 import '../widgets/app_colors.dart';
+import '../widgets/emergency_location_card.dart';
 
 class EmergencyReportScreen extends StatefulWidget {
   const EmergencyReportScreen({super.key});
@@ -30,6 +33,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   final _longitudeController = TextEditingController();
   final _record = AudioRecorder();
   final _speech = SpeechToText();
+  final _locationService = LocationService();
 
   EmergencyLanguageOption _selectedLanguage = EmergencyLanguageOption.english;
   List<LocaleName> _sttLocales = [];
@@ -44,6 +48,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   String? _backendUrl;
   bool _isDiscoveringBackend = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  EmergencyLocation? _currentLocation;
+  EmergencyCall? _lastSavedCall;
 
   @override
   void initState() {
@@ -124,7 +130,29 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     final shortId = call.id.length > 8 ? '${call.id.substring(0, 8)}…' : call.id;
     final lat = call.latitude?.toString() ?? 'not set';
     final long = call.longitude?.toString() ?? 'not set';
-    return 'Saved (id: $shortId). Lat: $lat, Long: $long. Status: ${call.status}.';
+    final accuracy = call.locationAccuracy == null
+        ? ''
+        : ' Accuracy: ${call.locationAccuracy!.toStringAsFixed(1)}m.';
+    return 'Saved (id: $shortId). Lat: $lat, Long: $long.$accuracy Status: ${call.status}.';
+  }
+
+  Future<EmergencyLocation?> _locationForSubmission() async {
+    try {
+      final location = await _locationService.getCurrentLocation();
+      if (!mounted) return location;
+      setState(() {
+        _currentLocation = location;
+        _latitudeController.text = location.latitude.toStringAsFixed(7);
+        _longitudeController.text = location.longitude.toStringAsFixed(7);
+        _statusMessage = 'GPS location captured (±${location.accuracy.toStringAsFixed(1)} m).';
+      });
+      return location;
+    } catch (error) {
+      if (mounted) {
+        setState(() => _statusMessage = 'GPS unavailable; submitting without live location. $error');
+      }
+      return null;
+    }
   }
 
   void _onLanguageChanged(EmergencyLanguageOption? value) {
@@ -274,12 +302,16 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      final location = await _locationForSubmission();
       final call = await EmergencyApiService().submitTextEmergency(
         text: text,
         language: language!,
-        latitude: _parseCoordinate(_latitudeController.text),
-        longitude: _parseCoordinate(_longitudeController.text),
+        latitude: location?.latitude ?? _parseCoordinate(_latitudeController.text),
+        longitude: location?.longitude ?? _parseCoordinate(_longitudeController.text),
+        locationAccuracy: location?.accuracy ?? _currentLocation?.accuracy,
+        locationTimestamp: location?.timestamp ?? _currentLocation?.timestamp,
       );
+      _lastSavedCall = call;
       _showMessage(_formatSavedCall(call));
       _textController.clear();
     } catch (error) {
@@ -315,14 +347,17 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      final location = await _locationForSubmission();
       final service = EmergencyApiService();
       if (transcription.isNotEmpty) {
         final call = await service.submitVoiceAndText(
           audioFile: file,
           transcription: transcription,
           language: language!,
-          latitude: _parseCoordinate(_latitudeController.text),
-          longitude: _parseCoordinate(_longitudeController.text),
+          latitude: location?.latitude ?? _parseCoordinate(_latitudeController.text),
+          longitude: location?.longitude ?? _parseCoordinate(_longitudeController.text),
+          locationAccuracy: location?.accuracy ?? _currentLocation?.accuracy,
+          locationTimestamp: location?.timestamp ?? _currentLocation?.timestamp,
           clientMetadata: {
             'platform': 'flutter',
             'recorded_at': DateTime.now().toIso8601String(),
@@ -330,15 +365,19 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
             'stt_locale': _activeSttLocale?.localeId,
           },
         );
+        _lastSavedCall = call;
         _showMessage(_formatSavedCall(call));
         _textController.clear();
       } else {
         final call = await service.submitAudioEmergency(
           audioFile: file,
           language: language!,
-          latitude: _parseCoordinate(_latitudeController.text),
-          longitude: _parseCoordinate(_longitudeController.text),
+          latitude: location?.latitude ?? _parseCoordinate(_latitudeController.text),
+          longitude: location?.longitude ?? _parseCoordinate(_longitudeController.text),
+          locationAccuracy: location?.accuracy ?? _currentLocation?.accuracy,
+          locationTimestamp: location?.timestamp ?? _currentLocation?.timestamp,
         );
+        _lastSavedCall = call;
         _showMessage(
           '${_formatSavedCall(call)} Add text next time for full voice+text storage.',
         );
@@ -512,6 +551,16 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.my_location),
+                label: const Text('Capture current GPS location'),
+                onPressed: _isSubmitting
+                    ? null
+                    : () async {
+                        await _locationForSubmission();
+                      },
+              ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 icon: const Icon(Icons.send_rounded),
@@ -588,6 +637,10 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                     fontSize: 14,
                   ),
                 ),
+              if (_lastSavedCall != null) ...[
+                const SizedBox(height: 18),
+                EmergencyLocationCard(call: _lastSavedCall!),
+              ],
             ],
           ),
         ),

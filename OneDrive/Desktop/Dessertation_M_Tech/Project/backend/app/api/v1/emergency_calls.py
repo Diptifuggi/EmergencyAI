@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ from ...schemas.emergency_call import (
     EmergencyCallUpdate,
 )
 from ...services.emergency_call_analysis_runner import run_post_create_analysis
+from ...services.location_service import reverse_geocode
 
 
 router = APIRouter()
@@ -44,6 +46,24 @@ logger = get_logger("app.api.v1.emergency_calls")
 
 UPLOAD_DIR = BASE_DIR / "backend" / "storage" / "audio"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+async def _location_address(latitude: float | None, longitude: float | None) -> str | None:
+    if latitude is None or longitude is None:
+        return None
+    return await reverse_geocode(latitude, longitude)
+
+
+def _parse_location_timestamp(raw: str | None) -> datetime | None:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="location_timestamp must be a valid ISO-8601 timestamp",
+        ) from exc
 
 
 def _parse_metadata(raw: str | None) -> dict[str, Any] | None:
@@ -94,13 +114,18 @@ def convert_uploaded_audio_to_mp3(audio_bytes: bytes, original_filename: str) ->
             detail="Audio conversion requires FFmpeg to be installed on the server.",
         )
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as source_file, tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as output_file:
-        source_file.write(audio_bytes)
-        source_file.flush()
-        source_path = Path(source_file.name)
-        output_path = Path(output_file.name)
+    # Create temporary files and close them immediately to release the file handle lock on Windows.
+    source_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+    output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    
+    source_path = Path(source_file.name)
+    output_path = Path(output_file.name)
 
     try:
+        source_file.write(audio_bytes)
+        source_file.close()
+        output_file.close()
+
         completed = subprocess.run(
             [
                 ffmpeg_path,
@@ -181,6 +206,9 @@ async def create_text_emergency(
         language=payload.language,
         latitude=payload.latitude,
         longitude=payload.longitude,
+        location_accuracy=payload.location_accuracy,
+        location_timestamp=payload.location_timestamp,
+        location_address=await _location_address(payload.latitude, payload.longitude),
         source=payload.source,
         priority=payload.priority,
         client_metadata=payload.client_metadata,
@@ -210,6 +238,8 @@ async def create_audio_emergency(
     transcription: str | None = Form(None),
     latitude: float | None = Form(None),
     longitude: float | None = Form(None),
+    location_accuracy: float | None = Form(None),
+    location_timestamp: str | None = Form(None),
     source: str = Form("flutter"),
     priority: str = Form("normal"),
     client_metadata: str | None = Form(None),
@@ -250,6 +280,9 @@ async def create_audio_emergency(
         client_metadata=meta,
         latitude=latitude,
         longitude=longitude,
+        location_accuracy=location_accuracy,
+        location_timestamp=_parse_location_timestamp(location_timestamp),
+        location_address=await _location_address(latitude, longitude),
     )
 
     try:
@@ -284,6 +317,8 @@ async def create_voice_and_text_emergency(
     language: str = Form(...),
     latitude: float | None = Form(None),
     longitude: float | None = Form(None),
+    location_accuracy: float | None = Form(None),
+    location_timestamp: str | None = Form(None),
     source: str = Form("flutter"),
     priority: str = Form("normal"),
     client_metadata: str | None = Form(None),
@@ -315,6 +350,9 @@ async def create_voice_and_text_emergency(
         client_metadata=meta,
         latitude=latitude,
         longitude=longitude,
+        location_accuracy=location_accuracy,
+        location_timestamp=_parse_location_timestamp(location_timestamp),
+        location_address=await _location_address(latitude, longitude),
     )
 
     try:

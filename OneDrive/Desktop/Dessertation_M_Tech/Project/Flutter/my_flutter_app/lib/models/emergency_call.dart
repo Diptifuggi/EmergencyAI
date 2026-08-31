@@ -15,6 +15,9 @@ class EmergencyCall {
   final Map<String, dynamic>? clientMetadata;
   final double? latitude;
   final double? longitude;
+  final double? locationAccuracy;
+  final String? locationTimestamp;
+  final String? locationAddress;
   final String? createdAt;
   final String? updatedAt;
 
@@ -35,6 +38,9 @@ class EmergencyCall {
     this.clientMetadata,
     this.latitude,
     this.longitude,
+    this.locationAccuracy,
+    this.locationTimestamp,
+    this.locationAddress,
     this.createdAt,
     this.updatedAt,
   });
@@ -60,6 +66,9 @@ class EmergencyCall {
           : null,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      locationAccuracy: (json['location_accuracy'] as num?)?.toDouble(),
+      locationTimestamp: json['location_timestamp']?.toString(),
+      locationAddress: json['location_address'] as String?,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
     );

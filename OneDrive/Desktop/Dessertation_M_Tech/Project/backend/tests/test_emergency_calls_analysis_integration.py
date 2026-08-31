@@ -45,7 +45,7 @@ async def test_create_text_emergency_with_analysis(
     assert response.status_code == 201
     data = response.json()
     assert data["status"] == STATUS_ANALYZED
-    assert data["priority"] == "high"
+    assert data["priority"] == "critical"
     assert data["text_content"] == payload["text"]
     assert data["call_type"] == "text"
     assert "emergency_analysis" in data["client_metadata"]
@@ -242,9 +242,9 @@ async def test_multiple_emergency_scenarios(
             priority_score=50,
             priority_level=AnalysisLevel.MEDIUM,
             panic_score=40,
-            panic_level=AnalysisLevel.LOW,
+                panic_level=AnalysisLevel.MEDIUM,
             stress_score=35,
-            stress_level=AnalysisLevel.LOW,
+                stress_level=AnalysisLevel.MEDIUM,
             dispatch_recommendation=DispatchRecommendation(
                 recommended_units=scenario["expected_units"]
             ),

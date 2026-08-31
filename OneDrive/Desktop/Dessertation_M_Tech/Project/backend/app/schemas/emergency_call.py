@@ -19,8 +19,10 @@ class EmergencyCallTextCreate(BaseModel):
         max_length=35,
         pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*$",
     )
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    location_accuracy: float | None = Field(default=None, ge=0)
+    location_timestamp: datetime | None = None
     source: str = Field(default="flutter", min_length=1, max_length=50)
     priority: str = Field(default="normal", min_length=1, max_length=35)
     client_metadata: dict[str, Any] | None = None
@@ -44,8 +46,10 @@ class EmergencyCallUpdate(BaseModel):
     status: str | None = Field(default=None, min_length=1, max_length=35)
     priority: str | None = Field(default=None, min_length=1, max_length=35)
     language: str | None = Field(default=None, min_length=2, max_length=35)
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    location_accuracy: float | None = Field(default=None, ge=0)
+    location_timestamp: datetime | None = None
     client_metadata: dict[str, Any] | None = None
 
     @field_validator("transcription", "text_content", "status", "priority", "language")
@@ -77,6 +81,9 @@ class EmergencyCallOut(BaseModel):
     client_metadata: dict[str, Any] | None = None
     latitude: float | None = None
     longitude: float | None = None
+    location_accuracy: float | None = None
+    location_timestamp: datetime | None = None
+    location_address: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = 'http://localhost:11434'
 
     OLLAMA_MODEL: str = 'qwen2.5:0.5b'
+    OLLAMA_DECODING_MODEL: str = 'qwen2.5:0.5b'
+    OLLAMA_ENCODING_MODEL: str = 'kimi'
+
+    # Optional local geospatial enrichment. Never use a public runtime service.
+    NOMINATIM_URL: str = 'http://localhost:8080'
+    NOMINATIM_TIMEOUT_SECONDS: float = 2.0
+    NOMINATIM_COUNTRY_CODE: str = 'in'
+    MAP_TILE_URL: str = 'http://localhost:8081/tiles/{z}/{x}/{y}.png'
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / '.env',

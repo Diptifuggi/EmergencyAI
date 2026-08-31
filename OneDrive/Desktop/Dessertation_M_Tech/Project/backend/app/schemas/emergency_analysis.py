@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class EmergencyType(str, Enum):
@@ -83,11 +83,12 @@ class DispatchRecommendation(BaseModel):
 
 
 class EmergencyAnalysis(BaseModel):
-    """Validated structured analysis suitable for client_metadata['emergency_analysis']."""
+    """Validated final analysis; levels are derived from bounded scores."""
 
     model_config = ConfigDict(extra="forbid")
 
     emergency_type: EmergencyType
+    severity: AnalysisLevel = AnalysisLevel.MEDIUM
     help_required: list[HelpRequired] = Field(default_factory=list, max_length=10)
     emergency_keywords: list[str] = Field(default_factory=list, max_length=20)
     priority_score: int = Field(ge=0, le=100)
@@ -98,6 +99,18 @@ class EmergencyAnalysis(BaseModel):
     stress_level: AnalysisLevel
     dispatch_recommendation: DispatchRecommendation
     confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_score_levels(self) -> "EmergencyAnalysis":
+        from ..services.scoring_policy import level_for_score
+
+        if self.priority_level != level_for_score(self.priority_score):
+            raise ValueError("priority_level must be derived from priority_score")
+        if self.stress_level != level_for_score(self.stress_score):
+            raise ValueError("stress_level must be derived from stress_score")
+        if self.panic_level != level_for_score(self.panic_score):
+            raise ValueError("panic_level must be derived from panic_score")
+        return self
 
     @field_validator("emergency_keywords")
     @classmethod
@@ -141,10 +154,14 @@ class _RawEmergencyAnalysis(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     emergency_type: str
+    # Evidence extraction fields; defaults keep legacy model output compatible.
+    severity: str | None = None
+    immediate_threat: bool = False
+    people_at_risk: int = Field(default=0, ge=0)
     help_required: list[str] = Field(default_factory=list)
     emergency_keywords: list[str] = Field(default_factory=list)
-    priority_score: int
-    priority_level: str
+    priority_score: int = 0
+    priority_level: str = "MEDIUM"
     panic_score: int
     panic_level: str
     stress_score: int
