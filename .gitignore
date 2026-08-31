@@ -44,3 +44,6 @@ map-tiles/
 # VSCode
 .vscode/
 >>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
+# Logs
+*.log
+backend/backend/logs/
