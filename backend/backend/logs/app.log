@@ -1457,3 +1457,8 @@ Error opening input files: Invalid data found when processing input
 2026-08-31 10:47:52 | INFO | app.main | Startup complete in 0.47 seconds
 2026-08-31 10:47:52 | INFO | app.main | Audio detector backend: lightweight_fallback
 2026-08-31 10:47:52 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-08-31 11:29:54 | INFO | app.main | Shutting down gracefully
+2026-08-31 11:30:10 | INFO | app.main | Database connection verified
+2026-08-31 11:30:10 | INFO | app.main | Startup complete in 0.31 seconds
+2026-08-31 11:30:10 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-08-31 11:30:10 | INFO | app.main | Ollama model: qwen2.5:0.5b

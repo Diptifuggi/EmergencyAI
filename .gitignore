@@ -1,8 +1,24 @@
-<<<<<<< HEAD
 # Secrets and local configuration
 .env
 **/.env
 !.env.example
+
+# Python
+backend/.venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Node
+node_modules/
+dist/
+
+# Vite
+.vite/
+
+# VSCode
+.vscode/
 
 # OSM/Nominatim imports and generated map data
 osm-data/
@@ -13,26 +29,4 @@ nominatim-data/
 postgres-data/
 **/postgres-data/
 map-tiles/
-**/map-tiles/backend/.venv/
-.venv/
-__pycache__/
-**/__pycache__/
-*.pyc
-backend/.venv/
-.venv/
-=======
-# Python
-__pycache__/
-*.pyc
-.env
-
-# Node
-node_modules/
-dist/
-
-# Vite
-/.vite
-
-# VSCode
-.vscode/
->>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
+**/map-tiles/
