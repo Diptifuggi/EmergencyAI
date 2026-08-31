@@ -1,0 +1,7 @@
+cd "C:\Users\USER\OneDrive\Desktop\Dessertation_M_Tech\Project\Flutter\my_flutter_app"
+flutter run
+python main.py
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+npm run dev 
+http://localhost:8000/docs - swagger
+.venv\Scripts\activate
