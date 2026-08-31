@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Secrets and local configuration
 .env
 **/.env
@@ -19,3 +20,19 @@ __pycache__/
 *.pyc
 backend/.venv/
 .venv/
+=======
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+dist/
+
+# Vite
+/.vite
+
+# VSCode
+.vscode/
+>>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
