@@ -46,6 +46,8 @@ logger = get_logger("app.api.v1.emergency_calls")
 
 UPLOAD_DIR = BASE_DIR / "backend" / "storage" / "audio"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAP_SNAPSHOT_DIR = BASE_DIR / "backend" / "storage" / "map_snapshots"
+MAP_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def _location_address(latitude: float | None, longitude: float | None) -> str | None:
@@ -66,6 +68,29 @@ def _parse_location_timestamp(raw: str | None) -> datetime | None:
         ) from exc
 
 
+def _validate_coordinates(latitude: float | None, longitude: float | None, accuracy: float | None) -> None:
+    if latitude is not None and (latitude < -90 or latitude > 90):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="latitude must be between -90 and 90",
+        )
+    if longitude is not None and (longitude < -180 or longitude > 180):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="longitude must be between -180 and 180",
+        )
+    if accuracy is not None and accuracy < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="location_accuracy must be non-negative",
+        )
+
+
+def _location_status(latitude: float | None, longitude: float | None) -> str:
+    """Return the persisted location state from a complete GPS coordinate pair."""
+    return "captured" if latitude is not None and longitude is not None else "unavailable"
+
+
 def _parse_metadata(raw: str | None) -> dict[str, Any] | None:
     if raw is None or not raw.strip():
         return None
@@ -82,6 +107,13 @@ def _parse_metadata(raw: str | None) -> dict[str, Any] | None:
             detail="client_metadata must be a JSON object",
         )
     return parsed
+
+
+def _looks_like_mp3(contents: bytes) -> bool:
+    """Accept ID3-tagged files or MPEG audio frame headers, not placeholder text."""
+    if contents.startswith(b"ID3"):
+        return True
+    return len(contents) >= 2 and contents[0] == 0xFF and (contents[1] & 0xE0) == 0xE0
 
 
 def _resolve_ffmpeg_path() -> str | None:
@@ -150,16 +182,23 @@ def convert_uploaded_audio_to_mp3(audio_bytes: bytes, original_filename: str) ->
         if completed.returncode != 0:
             stderr = (completed.stderr or "").strip()
             logger.warning(
-                "Audio conversion fallback activated for %s: %s",
+                "Audio conversion failed filename=%s inputBytes=%d: %s",
                 original_filename,
+                len(audio_bytes),
                 stderr or "unknown ffmpeg error",
             )
-            return audio_bytes, ".mp3", "audio/mpeg"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded audio is not a valid or supported recording",
+            )
 
         converted_bytes = output_path.read_bytes()
         if not converted_bytes:
-            logger.warning("Converted audio for %s is empty; storing original payload instead.", original_filename)
-            return audio_bytes, ".mp3", "audio/mpeg"
+            logger.warning("Audio conversion produced empty output filename=%s inputBytes=%d", original_filename, len(audio_bytes))
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded audio conversion produced no audio data",
+            )
         return converted_bytes, ".mp3", "audio/mpeg"
     finally:
         if source_path.exists():
@@ -175,11 +214,36 @@ async def _save_audio_file(file: UploadFile) -> tuple[str, str, str, int]:
         raise InvalidFileTypeError(f"Extension {ext} not allowed")
 
     contents = await file.read()
+    logger.info(
+        "Audio upload received filename=%s contentType=%s bytes=%d field=file",
+        filename,
+        file.content_type or "unknown",
+        len(contents),
+    )
+    if not contents:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded audio is empty. Please record again.",
+        )
+    if ext == ".mp3" and not _looks_like_mp3(contents):
+        logger.warning("Audio upload rejected invalid MP3 filename=%s bytes=%d", filename, len(contents))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded MP3 does not contain a valid audio header",
+        )
     size_mb = len(contents) / (1024 * 1024)
     if size_mb > settings.MAX_UPLOAD_SIZE_MB:
         raise FileTooLargeError("Uploaded audio exceeds maximum allowed size")
 
     converted_bytes, converted_ext, content_type = convert_uploaded_audio_to_mp3(contents, filename)
+    if not converted_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded audio is empty after conversion")
+    if converted_ext == ".mp3" and not _looks_like_mp3(converted_bytes):
+        logger.warning("Audio conversion produced invalid MP3 filename=%s bytes=%d", filename, len(converted_bytes))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded audio could not be converted to a valid MP3",
+        )
     unique_filename = f"{uuid.uuid4().hex}{converted_ext}"
     target_path = UPLOAD_DIR / unique_filename
     try:
@@ -192,7 +256,38 @@ async def _save_audio_file(file: UploadFile) -> tuple[str, str, str, int]:
         ) from exc
 
     relative_path = str(Path("backend") / "storage" / "audio" / unique_filename)
-    return relative_path, filename, content_type, len(converted_bytes)
+    final_size = target_path.stat().st_size
+    logger.info(
+        "Audio upload stored filename=%s receivedBytes=%d writtenBytes=%d finalPath=%s",
+        filename,
+        len(contents),
+        len(converted_bytes),
+        relative_path,
+    )
+    if final_size != len(converted_bytes):
+        raise HTTPException(status_code=500, detail="Stored audio size verification failed")
+    return relative_path, filename, content_type, final_size
+
+
+async def _save_map_snapshot(file: UploadFile) -> tuple[str, str, str, int]:
+    filename = file.filename or "map_snapshot.png"
+    content_type = (file.content_type or "").lower()
+    if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise InvalidFileTypeError("Map snapshot must be PNG, JPEG, or WebP")
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=422, detail="Map snapshot must not be empty")
+    if len(contents) > settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+        raise FileTooLargeError("Map snapshot exceeds maximum allowed size")
+    extension = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[content_type]
+    unique_filename = f"{uuid.uuid4().hex}{extension}"
+    target_path = MAP_SNAPSHOT_DIR / unique_filename
+    try:
+        target_path.write_bytes(contents)
+    except OSError as exc:
+        logger.exception("Failed to save map snapshot: %s", exc)
+        raise HTTPException(status_code=500, detail="Unable to save map snapshot") from exc
+    return str(Path("backend") / "storage" / "map_snapshots" / unique_filename), filename, content_type, len(contents)
 
 
 @router.post("/text", response_model=EmergencyCallOut, status_code=status.HTTP_201_CREATED)
@@ -209,6 +304,7 @@ async def create_text_emergency(
         location_accuracy=payload.location_accuracy,
         location_timestamp=payload.location_timestamp,
         location_address=await _location_address(payload.latitude, payload.longitude),
+        location_status=_location_status(payload.latitude, payload.longitude),
         source=payload.source,
         priority=payload.priority,
         client_metadata=payload.client_metadata,
@@ -243,6 +339,7 @@ async def create_audio_emergency(
     source: str = Form("flutter"),
     priority: str = Form("normal"),
     client_metadata: str | None = Form(None),
+    map_snapshot: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """
@@ -254,7 +351,9 @@ async def create_audio_emergency(
     - transcription: text of the voice (optional; recommended from Flutter STT)
     - latitude / longitude / source / priority / client_metadata (optional JSON string)
     """
+    _validate_coordinates(latitude, longitude, location_accuracy)
     relative_path, original_name, content_type, size_bytes = await _save_audio_file(file)
+    snapshot_data = await _save_map_snapshot(map_snapshot) if map_snapshot else None
     meta = _parse_metadata(client_metadata)
     cleaned_transcription = (transcription or "").strip() or None
     cleaned_language = language.strip()
@@ -283,6 +382,11 @@ async def create_audio_emergency(
         location_accuracy=location_accuracy,
         location_timestamp=_parse_location_timestamp(location_timestamp),
         location_address=await _location_address(latitude, longitude),
+        location_status=_location_status(latitude, longitude),
+        map_snapshot_file_path=snapshot_data[0] if snapshot_data else None,
+        map_snapshot_filename=snapshot_data[1] if snapshot_data else None,
+        map_snapshot_content_type=snapshot_data[2] if snapshot_data else None,
+        map_snapshot_size=snapshot_data[3] if snapshot_data else None,
     )
 
     try:
@@ -291,6 +395,10 @@ async def create_audio_emergency(
         emergency.audio_url = str(
             request.url_for("get_emergency_audio_file", call_id=emergency.id)
         )
+        if snapshot_data:
+            emergency.map_snapshot_url = str(
+                request.url_for("get_emergency_map_snapshot", call_id=emergency.id)
+            )
         await db.commit()
         await db.refresh(emergency)
     except SQLAlchemyError as exc:
@@ -322,9 +430,11 @@ async def create_voice_and_text_emergency(
     source: str = Form("flutter"),
     priority: str = Form("normal"),
     client_metadata: str | None = Form(None),
+    map_snapshot: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """Requires both audio file and its text. Prefer this from the Flutter app."""
+    _validate_coordinates(latitude, longitude, location_accuracy)
     cleaned = transcription.strip()
     if not cleaned:
         raise HTTPException(
@@ -333,6 +443,7 @@ async def create_voice_and_text_emergency(
         )
 
     relative_path, original_name, content_type, size_bytes = await _save_audio_file(file)
+    snapshot_data = await _save_map_snapshot(map_snapshot) if map_snapshot else None
     meta = _parse_metadata(client_metadata)
 
     emergency = EmergencyCall(
@@ -353,6 +464,11 @@ async def create_voice_and_text_emergency(
         location_accuracy=location_accuracy,
         location_timestamp=_parse_location_timestamp(location_timestamp),
         location_address=await _location_address(latitude, longitude),
+        location_status=_location_status(latitude, longitude),
+        map_snapshot_file_path=snapshot_data[0] if snapshot_data else None,
+        map_snapshot_filename=snapshot_data[1] if snapshot_data else None,
+        map_snapshot_content_type=snapshot_data[2] if snapshot_data else None,
+        map_snapshot_size=snapshot_data[3] if snapshot_data else None,
     )
 
     try:
@@ -361,6 +477,10 @@ async def create_voice_and_text_emergency(
         emergency.audio_url = str(
             request.url_for("get_emergency_audio_file", call_id=emergency.id)
         )
+        if snapshot_data:
+            emergency.map_snapshot_url = str(
+                request.url_for("get_emergency_map_snapshot", call_id=emergency.id)
+            )
         await db.commit()
         await db.refresh(emergency)
     except SQLAlchemyError as exc:
@@ -426,6 +546,9 @@ async def update_emergency_call(
     for key, value in updates.items():
         setattr(emergency, key, value)
 
+    if "latitude" in updates or "longitude" in updates:
+        emergency.location_status = _location_status(emergency.latitude, emergency.longitude)
+
     if "transcription" in updates and updates["transcription"] and not emergency.text_content:
         emergency.text_content = updates["transcription"]
     if "transcription" in updates and updates["transcription"] and emergency.status == "pending_transcription":
@@ -467,4 +590,52 @@ async def get_emergency_audio_file(
         path,
         media_type=emergency.audio_content_type or "application/octet-stream",
         filename=emergency.original_audio_filename or path.name,
+    )
+
+
+@router.post("/{call_id}/map-snapshot", response_model=EmergencyCallOut, name="attach_emergency_map_snapshot")
+async def attach_emergency_map_snapshot(
+    call_id: uuid.UUID,
+    request: Request,
+    map_snapshot: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> EmergencyCall:
+    emergency = await db.get(EmergencyCall, call_id)
+    if not emergency:
+        raise HTTPException(status_code=404, detail="Emergency call not found")
+    relative_path, filename, content_type, size = await _save_map_snapshot(map_snapshot)
+    emergency.map_snapshot_file_path = relative_path
+    emergency.map_snapshot_filename = filename
+    emergency.map_snapshot_content_type = content_type
+    emergency.map_snapshot_size = size
+    emergency.map_snapshot_url = str(
+        request.url_for("get_emergency_map_snapshot", call_id=emergency.id)
+    )
+    try:
+        await db.commit()
+        await db.refresh(emergency)
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.exception("Failed to persist map snapshot metadata: %s", exc)
+        raise HTTPException(status_code=503, detail="Emergency storage is temporarily unavailable") from exc
+    return emergency
+
+
+@router.get("/{call_id}/map-snapshot", name="get_emergency_map_snapshot")
+async def get_emergency_map_snapshot(
+    call_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> FileResponse:
+    emergency = await db.get(EmergencyCall, call_id)
+    if not emergency or not emergency.map_snapshot_file_path:
+        raise HTTPException(status_code=404, detail="Map snapshot not found")
+    snapshot_path = BASE_DIR / emergency.map_snapshot_file_path
+    if not snapshot_path.exists():
+        snapshot_path = MAP_SNAPSHOT_DIR / Path(emergency.map_snapshot_file_path).name
+    if not snapshot_path.exists():
+        raise HTTPException(status_code=404, detail="Map snapshot file missing on disk")
+    return FileResponse(
+        snapshot_path,
+        media_type=emergency.map_snapshot_content_type or "image/png",
+        filename=emergency.map_snapshot_filename or snapshot_path.name,
     )

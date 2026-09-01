@@ -1,8 +1,10 @@
-<<<<<<< HEAD
 # Secrets and local configuration
 .env
 **/.env
 !.env.example
+
+# Flutter/Android local configuration, including API keys
+**/android/local.properties
 
 # Python
 backend/.venv/
@@ -10,19 +12,11 @@ backend/.venv/
 __pycache__/
 **/__pycache__/
 *.pyc
-=======
-# Python
-__pycache__/
-*.pyc
-.env
->>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
-
 # Node
 node_modules/
 dist/
 
 # Vite
-<<<<<<< HEAD
 .vite/
 
 # VSCode
@@ -38,12 +32,6 @@ postgres-data/
 **/postgres-data/
 map-tiles/
 **/map-tiles/
-=======
-/.vite
-
-# VSCode
-.vscode/
->>>>>>> 80f5c672890c8d88d201deb9a2c4066a0320a30e
 # Logs
 *.log
 backend/backend/logs/

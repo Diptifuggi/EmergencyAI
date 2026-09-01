@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
@@ -9,6 +10,44 @@ import '../core/network/api_client.dart';
 import '../models/emergency_call.dart';
 
 class EmergencyApiService {
+  Future<void> _addMapSnapshot(
+    http.MultipartRequest request,
+    Uint8List? bytes,
+  ) async {
+    if (bytes == null || bytes.isEmpty) return;
+    request.files.add(http.MultipartFile.fromBytes(
+      'map_snapshot',
+      bytes,
+      filename: 'map_snapshot.png',
+      contentType: http.MediaType('image', 'png'),
+    ));
+  }
+
+  Future<EmergencyCall> attachMapSnapshot({
+    required String callId,
+    required Uint8List bytes,
+  }) async {
+    final baseUrl = await ApiClient.getBaseUrl();
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/v1/emergency-calls/$callId/map-snapshot'),
+    )..files.add(http.MultipartFile.fromBytes(
+        'map_snapshot',
+        bytes,
+        filename: 'map_snapshot.png',
+        contentType: http.MediaType('image', 'png'),
+      ));
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode != 200) {
+      throw ApiException(
+        'Map snapshot upload failed (${response.statusCode}): ${response.body}',
+      );
+    }
+    return EmergencyCall.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
   String _validatedLanguage(String language) {
     final canonical = LanguageMapper.toApiCode(language);
     if (!LanguageMapper.isValidApiCode(canonical)) {
@@ -74,6 +113,8 @@ class EmergencyApiService {
     double? locationAccuracy,
     DateTime? locationTimestamp,
     Map<String, dynamic>? clientMetadata,
+    Uint8List? mapSnapshot,
+    Uint8List? audioBytes,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
     final uri = Uri.parse('$baseUrl/api/v1/emergency-calls/voice-text');
@@ -82,6 +123,7 @@ class EmergencyApiService {
       ..fields['language'] = _validatedLanguage(language)
       ..fields['transcription'] = transcription.trim()
       ..fields['source'] = 'flutter';
+    await _addMapSnapshot(request, mapSnapshot);
 
     if (latitude != null) {
       request.fields['latitude'] = latitude.toString();
@@ -93,22 +135,31 @@ class EmergencyApiService {
       request.fields['location_accuracy'] = locationAccuracy.toString();
     }
     if (locationTimestamp != null) {
-      request.fields['location_timestamp'] = locationTimestamp.toUtc().toIso8601String();
+      request.fields['location_timestamp'] =
+          locationTimestamp.toUtc().toIso8601String();
     }
     if (clientMetadata != null) {
       request.fields['client_metadata'] = jsonEncode(clientMetadata);
     }
 
+    final payload = audioBytes ?? await audioFile.readAsBytes();
+    debugPrint(
+      '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} '
+      'bytesSent=${payload.length} contentType=${_audioMediaType(audioFile.path)}',
+    );
     request.files.add(
-      await http.MultipartFile.fromPath(
+      http.MultipartFile.fromBytes(
         'file',
-        audioFile.path,
+        payload,
         filename: audioFile.path.split(Platform.pathSeparator).last,
+        contentType: _audioMediaType(audioFile.path),
       ),
     );
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
+    debugPrint(
+        '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} responseStatus=${response.statusCode}');
 
     if (response.statusCode != 201) {
       throw ApiException(
@@ -136,12 +187,15 @@ class EmergencyApiService {
     double? locationAccuracy,
     DateTime? locationTimestamp,
     Map<String, dynamic>? clientMetadata,
+    Uint8List? mapSnapshot,
+    Uint8List? audioBytes,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
     final uri = Uri.parse('$baseUrl/api/v1/emergency-calls/audio');
     final request = http.MultipartRequest('POST', uri)
       ..fields['language'] = _validatedLanguage(language)
       ..fields['source'] = 'flutter';
+    await _addMapSnapshot(request, mapSnapshot);
 
     if (transcription != null && transcription.trim().isNotEmpty) {
       request.fields['transcription'] = transcription.trim();
@@ -156,22 +210,31 @@ class EmergencyApiService {
       request.fields['location_accuracy'] = locationAccuracy.toString();
     }
     if (locationTimestamp != null) {
-      request.fields['location_timestamp'] = locationTimestamp.toUtc().toIso8601String();
+      request.fields['location_timestamp'] =
+          locationTimestamp.toUtc().toIso8601String();
     }
     if (clientMetadata != null) {
       request.fields['client_metadata'] = jsonEncode(clientMetadata);
     }
 
+    final payload = audioBytes ?? await audioFile.readAsBytes();
+    debugPrint(
+      '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} '
+      'bytesSent=${payload.length} contentType=${_audioMediaType(audioFile.path)}',
+    );
     request.files.add(
-      await http.MultipartFile.fromPath(
+      http.MultipartFile.fromBytes(
         'file',
-        audioFile.path,
+        payload,
         filename: audioFile.path.split(Platform.pathSeparator).last,
+        contentType: _audioMediaType(audioFile.path),
       ),
     );
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
+    debugPrint(
+        '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} responseStatus=${response.statusCode}');
 
     if (response.statusCode != 201) {
       throw ApiException(
@@ -187,6 +250,24 @@ class EmergencyApiService {
       'lat=${call.latitude} long=${call.longitude} status=${call.status}',
     );
     return call;
+  }
+
+  http.MediaType _audioMediaType(String filePath) {
+    final extension = filePath.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'm4a':
+        return http.MediaType('audio', 'mp4');
+      case 'mp3':
+        return http.MediaType('audio', 'mpeg');
+      case 'wav':
+        return http.MediaType('audio', 'wav');
+      case 'ogg':
+        return http.MediaType('audio', 'ogg');
+      case 'aac':
+        return http.MediaType('audio', 'aac');
+      default:
+        return http.MediaType('application', 'octet-stream');
+    }
   }
 
   Future<List<EmergencyCall>> listEmergencyCalls({

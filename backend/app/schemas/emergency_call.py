@@ -1,10 +1,10 @@
 from __future__ import annotations
-
+            # Older rows may predate the persisted status column.
 from datetime import datetime
 from typing import Any
 from uuid import UUID
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+            # Fall back to coordinates for records created before this migration.
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class EmergencyCallTextCreate(BaseModel):
@@ -61,6 +61,18 @@ class EmergencyCallUpdate(BaseModel):
         return value or None
 
 
+class LocationResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    latitude: float | None = None
+    longitude: float | None = None
+    accuracy_meters: float | None = None
+    captured_at: datetime | None = None
+    location_available: bool
+    status: str
+    reason: str | None = None
+
+
 class EmergencyCallOut(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
@@ -84,8 +96,82 @@ class EmergencyCallOut(BaseModel):
     location_accuracy: float | None = None
     location_timestamp: datetime | None = None
     location_address: str | None = None
+    location_status: str = "unavailable"
+    map_snapshot_available: bool = False
+    map_snapshot_filename: str | None = None
+    map_snapshot_content_type: str | None = None
+    map_snapshot_size: int | None = None
+    map_snapshot_url: str | None = None
     created_at: datetime
     updated_at: datetime
+    location: LocationResponse | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_location(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Check if already populated
+            if "location" in data and data["location"] is not None:
+                return data
+            lat = data.get("latitude")
+            lon = data.get("longitude")
+            acc = data.get("location_accuracy")
+            ts = data.get("location_timestamp")
+            meta = data.get("client_metadata") or {}
+            location_status = data.get("location_status") or (
+                "captured" if lat is not None and lon is not None else "unavailable"
+            )
+            # Older rows may predate the persisted status column.
+            if lat is not None and lon is not None:
+                data["location"] = {
+                    "latitude": lat,
+                    "longitude": lon,
+                    "accuracy_meters": acc,
+                    "captured_at": ts,
+                    "location_available": True,
+                    "status": location_status,
+                }
+            else:
+                reason = meta.get("location_error") if isinstance(meta, dict) else None
+                if not reason:
+                    reason = "Location permission denied"
+                data["location"] = {
+                    "location_available": False,
+                    "status": location_status,
+                    "reason": reason,
+                }
+        else:
+            # Check if already populated
+            if getattr(data, "location", None) is not None:
+                return data
+            lat = getattr(data, "latitude", None)
+            lon = getattr(data, "longitude", None)
+            acc = getattr(data, "location_accuracy", None)
+            ts = getattr(data, "location_timestamp", None)
+            meta = getattr(data, "client_metadata", None) or {}
+            location_status = getattr(data, "location_status", None) or (
+                "captured" if lat is not None and lon is not None else "unavailable"
+            )
+            # Fall back to coordinates for records created before this migration.
+            if lat is not None and lon is not None:
+                data.location = LocationResponse(
+                    latitude=lat,
+                    longitude=lon,
+                    accuracy_meters=acc,
+                    captured_at=ts,
+                    location_available=True,
+                    status=location_status,
+                )
+            else:
+                reason = meta.get("location_error") if isinstance(meta, dict) else None
+                if not reason:
+                    reason = "Location permission denied"
+                data.location = LocationResponse(
+                    location_available=False,
+                    status=location_status,
+                    reason=reason,
+                )
+        return data
 
 
 class EmergencyCallListOut(BaseModel):

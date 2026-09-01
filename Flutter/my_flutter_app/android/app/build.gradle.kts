@@ -4,6 +4,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties
+
+// Load Google Maps API key from local properties file (not committed to Git)
+val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties()
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use { input -> 
+        localProperties.load(input) 
+    }
+}
+val googleMapsApiKey = localProperties.getProperty("GOOGLE_MAPS_API_KEY") ?: "PLACEHOLDER"
+
 android {
     namespace = "com.emergencyiq.my_flutter_app"
     compileSdk = flutter.compileSdkVersion
@@ -23,6 +35,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Inject Google Maps API key into AndroidManifest.xml
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsApiKey
     }
 
     buildTypes {

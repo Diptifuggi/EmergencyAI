@@ -1,4 +1,6 @@
+import io
 import uuid
+import wave
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -26,6 +28,16 @@ def emergency_text_payload() -> dict:
         "location_accuracy": 8.5,
         "location_timestamp": "2026-08-27T10:30:00Z",
     }
+
+
+def valid_wav_bytes() -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(8000)
+        wav.writeframes(b"\x00\x00" * 800)
+    return buffer.getvalue()
 
 
 @pytest.fixture(autouse=True)
@@ -61,17 +73,52 @@ async def test_create_text_emergency(async_client: AsyncClient) -> None:
     assert data["location_accuracy"] == payload["location_accuracy"]
     assert data["location_timestamp"].startswith("2026-08-27T10:30:00")
     assert data["location_address"] == "Anand, Gujarat, India"
+    assert data["location_status"] == "captured"
     assert "emergency_analysis" in data["client_metadata"]
     assert uuid.UUID(data["id"])
 
 
 @pytest.mark.asyncio
+async def test_map_snapshot_is_linked_to_existing_emergency_call(
+    async_client: AsyncClient,
+) -> None:
+    with patch(
+        "app.api.v1.emergency_calls.reverse_geocode",
+        new=AsyncMock(return_value=None),
+    ):
+        created = await async_client.post(
+            "/api/v1/emergency-calls/text",
+            json=emergency_text_payload(),
+        )
+    assert created.status_code == 201
+    call_id = created.json()["id"]
+    snapshot = b"fake-png-payload"
+
+    uploaded = await async_client.post(
+        f"/api/v1/emergency-calls/{call_id}/map-snapshot",
+        files={"map_snapshot": ("caller-map.png", snapshot, "image/png")},
+    )
+
+    assert uploaded.status_code == 200
+    body = uploaded.json()
+    assert body["id"] == call_id
+    assert body["map_snapshot_available"] is True
+    assert body["map_snapshot_content_type"] == "image/png"
+    assert body["map_snapshot_url"].endswith(f"/{call_id}/map-snapshot")
+
+    retrieved = await async_client.get(f"/api/v1/emergency-calls/{call_id}/map-snapshot")
+    assert retrieved.status_code == 200
+    assert retrieved.headers["content-type"] == "image/png"
+    assert retrieved.content == snapshot
+
+
+@pytest.mark.asyncio
 async def test_create_audio_emergency(async_client: AsyncClient, tmp_path: Path) -> None:
-    temp_path = tmp_path / "test_emergency_audio.m4a"
-    temp_path.write_bytes(b"RIFF....\x00\x00\x00")
+    temp_path = tmp_path / "test_emergency_audio.wav"
+    temp_path.write_bytes(valid_wav_bytes())
 
     with temp_path.open("rb") as file_handle:
-        files = {"file": ("test_emergency_audio.m4a", file_handle, "audio/m4a")}
+        files = {"file": ("test_emergency_audio.wav", file_handle, "audio/wav")}
         data = {"language": "en"}
         response = await async_client.post("/api/v1/emergency-calls/audio", files=files, data=data)
 
@@ -80,17 +127,32 @@ async def test_create_audio_emergency(async_client: AsyncClient, tmp_path: Path)
     assert data["status"] == STATUS_PENDING_TRANSCRIPTION
     assert data["call_type"] == "audio"
     assert data["audio_file_path"] is not None
-    assert data["original_audio_filename"] == "test_emergency_audio.m4a"
+    assert data["original_audio_filename"] == "test_emergency_audio.wav"
     assert data["audio_url"] is not None
+    stored_path = Path(data["audio_file_path"])
+    assert stored_path.exists()
+    assert stored_path.stat().st_size > 14
+    assert data["audio_file_size"] == stored_path.stat().st_size
+
+
+@pytest.mark.asyncio
+async def test_create_audio_rejects_placeholder_bytes(async_client: AsyncClient) -> None:
+    response = await async_client.post(
+        "/api/v1/emergency-calls/audio",
+        files={"file": ("placeholder.mp3", b"fake-mp3-bytes", "audio/mpeg")},
+        data={"language": "en"},
+    )
+    assert response.status_code == 400
+    assert "valid audio header" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
 async def test_create_voice_and_text(async_client: AsyncClient, tmp_path: Path) -> None:
-    temp_path = tmp_path / "voice.m4a"
-    temp_path.write_bytes(b"fake-audio-bytes")
+    temp_path = tmp_path / "voice.wav"
+    temp_path.write_bytes(valid_wav_bytes())
 
     with temp_path.open("rb") as file_handle:
-        files = {"file": ("voice.m4a", file_handle, "audio/m4a")}
+        files = {"file": ("voice.wav", file_handle, "audio/wav")}
         data = {
             "language": "en",
             "transcription": "Help needed at the highway junction",
@@ -118,7 +180,7 @@ async def test_create_audio_emergency_converts_mp4_to_mp3(async_client: AsyncCli
 
     with patch(
         "app.api.v1.emergency_calls.convert_uploaded_audio_to_mp3",
-        return_value=(b"fake-mp3-bytes", ".mp3", "audio/mpeg"),
+        return_value=(b"ID3" + b"\x00" * 32, ".mp3", "audio/mpeg"),
     ) as mocked_converter:
         with temp_path.open("rb") as file_handle:
             files = {"file": ("voice.mp4", file_handle, "video/mp4")}
@@ -226,4 +288,99 @@ def test_convert_uploaded_audio_to_mp3_real_or_mocked_ffmpeg() -> None:
             assert res_mime == "audio/mpeg"
 
     assert len(called_args) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_text_emergency_validation(async_client: AsyncClient) -> None:
+    # Invalid latitude
+    payload = emergency_text_payload()
+    payload["latitude"] = 999.0
+    response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+    assert response.status_code == 422
+
+    # Invalid longitude
+    payload = emergency_text_payload()
+    payload["longitude"] = -200.0
+    response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+    assert response.status_code == 422
+
+    # Invalid accuracy
+    payload = emergency_text_payload()
+    payload["location_accuracy"] = -5.0
+    response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_audio_emergency_validation(async_client: AsyncClient, tmp_path: Path) -> None:
+    temp_path = tmp_path / "test.m4a"
+    temp_path.write_bytes(b"fake-audio")
+
+    # Invalid latitude Form param
+    with patch(
+        "app.api.v1.emergency_calls.convert_uploaded_audio_to_mp3",
+        return_value=(b"fake-mp3-bytes", ".mp3", "audio/mpeg"),
+    ):
+        with temp_path.open("rb") as file_handle:
+            files = {"file": ("test.m4a", file_handle, "audio/m4a")}
+            data = {"language": "en", "latitude": "999"}
+            response = await async_client.post("/api/v1/emergency-calls/audio", files=files, data=data)
+            assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_voice_text_emergency_validation(async_client: AsyncClient, tmp_path: Path) -> None:
+    temp_path = tmp_path / "test.m4a"
+    temp_path.write_bytes(b"fake-audio")
+
+    # Invalid longitude Form param
+    with patch(
+        "app.api.v1.emergency_calls.convert_uploaded_audio_to_mp3",
+        return_value=(b"fake-mp3-bytes", ".mp3", "audio/mpeg"),
+    ):
+        with temp_path.open("rb") as file_handle:
+            files = {"file": ("test.m4a", file_handle, "audio/m4a")}
+            data = {
+                "language": "en",
+                "transcription": "Help!",
+                "longitude": "200.0"
+            }
+            response = await async_client.post("/api/v1/emergency-calls/voice-text", files=files, data=data)
+            assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_text_emergency_location_unavailable(async_client: AsyncClient) -> None:
+    payload = {
+        "text": "Location is disabled on my device",
+        "language": "en",
+        "client_metadata": {"location_error": "Location permission denied"}
+    }
+    response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["location"]["location_available"] is False
+    assert data["location_status"] == "unavailable"
+    assert data["location"]["status"] == "unavailable"
+    assert data["location"]["reason"] == "Location permission denied"
+
+
+@pytest.mark.asyncio
+async def test_create_text_emergency_location_available(async_client: AsyncClient) -> None:
+    payload = emergency_text_payload()
+    with patch(
+        "app.api.v1.emergency_calls.reverse_geocode",
+        new=AsyncMock(return_value="Anand Railway Station"),
+    ):
+        response = await async_client.post("/api/v1/emergency-calls/text", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["location"]["location_available"] is True
+    assert data["location_status"] == "captured"
+    assert data["location"]["status"] == "captured"
+    assert data["location"]["latitude"] == payload["latitude"]
+    assert data["location"]["longitude"] == payload["longitude"]
+    assert data["location"]["accuracy_meters"] == payload["location_accuracy"]
+    assert data["location"]["captured_at"].startswith("2026-08-27T10:30:00")
+
 

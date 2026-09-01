@@ -1,4 +1,6 @@
+import io
 import uuid
+import wave
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -19,6 +21,16 @@ from app.schemas.emergency_analysis import (
     HelpRequired,
 )
 from tests.conftest import make_analysis_failure, make_analysis_result, valid_ollama_json
+
+
+def valid_wav_bytes() -> bytes:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(8000)
+        wav.writeframes(b"\x00\x00" * 800)
+    return buffer.getvalue()
 
 
 @pytest_asyncio.fixture
@@ -62,10 +74,10 @@ async def test_create_audio_emergency_without_transcript_skips_analysis(
         "app.services.emergency_call_analysis_runner.EmergencyAnalysisService.analyze",
         new_callable=AsyncMock,
     ) as mocked_analyze:
-        temp_path = tmp_path / "test_audio_skip.m4a"
-        temp_path.write_bytes(b"RIFF....\x00\x00\x00")
+        temp_path = tmp_path / "test_audio_skip.wav"
+        temp_path.write_bytes(valid_wav_bytes())
         with temp_path.open("rb") as file_handle:
-            files = {"file": ("test_audio_skip.m4a", file_handle, "audio/m4a")}
+            files = {"file": ("test_audio_skip.wav", file_handle, "audio/wav")}
             data = {"language": "en"}
             response = await async_client.post(
                 "/api/v1/emergency-calls/audio", files=files, data=data
@@ -83,10 +95,10 @@ async def test_create_voice_and_text_preserves_metadata_and_analyzes(
     mock_analysis_success: AsyncMock,
     tmp_path: Path,
 ) -> None:
-    temp_path = tmp_path / "voice.m4a"
-    temp_path.write_bytes(b"fake-audio-bytes")
+    temp_path = tmp_path / "voice.wav"
+    temp_path.write_bytes(valid_wav_bytes())
     with temp_path.open("rb") as file_handle:
-        files = {"file": ("voice.m4a", file_handle, "audio/m4a")}
+        files = {"file": ("voice.wav", file_handle, "audio/wav")}
         data = {
             "language": "en",
             "transcription": "Help needed at the highway junction",

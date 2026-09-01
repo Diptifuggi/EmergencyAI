@@ -18,6 +18,9 @@ class EmergencyCall {
   final double? locationAccuracy;
   final String? locationTimestamp;
   final String? locationAddress;
+  final String locationStatus;
+  final bool mapSnapshotAvailable;
+  final String? mapSnapshotUrl;
   final String? createdAt;
   final String? updatedAt;
 
@@ -41,6 +44,9 @@ class EmergencyCall {
     this.locationAccuracy,
     this.locationTimestamp,
     this.locationAddress,
+    this.locationStatus = 'unavailable',
+    this.mapSnapshotAvailable = false,
+    this.mapSnapshotUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -69,6 +75,10 @@ class EmergencyCall {
       locationAccuracy: (json['location_accuracy'] as num?)?.toDouble(),
       locationTimestamp: json['location_timestamp']?.toString(),
       locationAddress: json['location_address'] as String?,
+      locationStatus: json['location_status'] as String? ?? 'unavailable',
+      mapSnapshotAvailable: json['map_snapshot_available'] as bool? ??
+          (json['map_snapshot_file_path'] != null),
+      mapSnapshotUrl: json['map_snapshot_url'] as String?,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
     );

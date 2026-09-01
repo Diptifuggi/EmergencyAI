@@ -56,6 +56,15 @@ class EmergencyCall(Base):
         DateTime(timezone=True), nullable=True
     )
     location_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # This is derived by the server/database from the coordinates; clients do not set it.
+    location_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unavailable", server_default="unavailable"
+    )
+    map_snapshot_file_path: Mapped[str | None] = mapped_column(String(260), nullable=True)
+    map_snapshot_filename: Mapped[str | None] = mapped_column(String(260), nullable=True)
+    map_snapshot_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    map_snapshot_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    map_snapshot_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -65,3 +74,7 @@ class EmergencyCall(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    @property
+    def map_snapshot_available(self) -> bool:
+        return bool(self.map_snapshot_file_path)

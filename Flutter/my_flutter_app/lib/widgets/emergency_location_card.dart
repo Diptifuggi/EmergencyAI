@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'dart:typed_data';
 
 import '../models/emergency_call.dart';
 import 'app_colors.dart';
 
-const _mapTileUrl = String.fromEnvironment(
-  'MAP_TILE_URL',
-  defaultValue: 'http://10.0.2.2:8081/tiles/{z}/{x}/{y}.png',
-);
-
 class EmergencyLocationCard extends StatelessWidget {
   final EmergencyCall call;
+  final Uint8List? mapSnapshot;
 
-  const EmergencyLocationCard({super.key, required this.call});
+  const EmergencyLocationCard(
+      {super.key, required this.call, this.mapSnapshot});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +17,6 @@ class EmergencyLocationCard extends StatelessWidget {
     final longitude = call.longitude;
     if (latitude == null || longitude == null) return const SizedBox.shrink();
 
-    final point = LatLng(latitude, longitude);
     return Card(
       color: AppColors.cardBackground,
       child: Padding(
@@ -29,42 +24,39 @@ class EmergencyLocationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Emergency location', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text('Emergency location',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('Location status: ${call.locationStatus}'),
             const SizedBox(height: 8),
             SizedBox(
               height: 220,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: FlutterMap(
-                  options: MapOptions(initialCenter: point, initialZoom: 15),
-                  children: [
-                    TileLayer(
-                      urlTemplate: _mapTileUrl,
-                      userAgentPackageName: 'com.emergencyiq.app',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: point,
-                          width: 48,
-                          height: 48,
-                          child: const Icon(Icons.location_pin, color: Colors.red, size: 44),
+                child: mapSnapshot != null && mapSnapshot!.isNotEmpty
+                    ? Image.memory(mapSnapshot!, fit: BoxFit.cover)
+                    : Container(
+                        color: Colors.grey.shade200,
+                        alignment: Alignment.center,
+                        child: Text(
+                          call.mapSnapshotAvailable
+                              ? 'Map snapshot available on the server'
+                              : 'Map snapshot unavailable',
+                          textAlign: TextAlign.center,
                         ),
-                      ],
-                    ),
-                    const RichAttributionWidget(
-                      attributions: [TextSourceAttribution('© OpenStreetMap contributors')],
-                    ),
-                  ],
-                ),
+                      ),
               ),
             ),
             const SizedBox(height: 8),
             Text('Latitude: $latitude\nLongitude: $longitude'),
             if (call.locationAccuracy != null)
-              Text('GPS accuracy: ${call.locationAccuracy!.toStringAsFixed(1)} m'),
-            if (call.locationAddress != null && call.locationAddress!.isNotEmpty)
+              Text(
+                  'GPS accuracy: ${call.locationAccuracy!.toStringAsFixed(1)} m'),
+            if (call.locationAddress != null &&
+                call.locationAddress!.isNotEmpty)
               Text('Address: ${call.locationAddress}'),
+            Text(
+                'Map snapshot: ${call.mapSnapshotAvailable ? 'available' : 'unavailable'}'),
           ],
         ),
       ),

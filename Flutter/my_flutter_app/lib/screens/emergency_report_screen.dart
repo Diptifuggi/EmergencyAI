@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
@@ -19,6 +20,7 @@ import '../services/emergency_api_service.dart';
 import '../services/location_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/emergency_location_card.dart';
+import 'map_screen.dart';
 
 class EmergencyReportScreen extends StatefulWidget {
   const EmergencyReportScreen({super.key});
@@ -50,6 +52,9 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   EmergencyLocation? _currentLocation;
   EmergencyCall? _lastSavedCall;
+  String? _locationError;
+  Uint8List? _mapSnapshot;
+  String _mapSnapshotStatus = 'Map snapshot not captured';
 
   @override
   void initState() {
@@ -109,7 +114,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       if (mounted) setState(() => _isDiscoveringBackend = false);
     }
 
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) async {
+    _connectivitySub =
+        Connectivity().onConnectivityChanged.listen((results) async {
       final onWifi = results.contains(ConnectivityResult.wifi) ||
           results.contains(ConnectivityResult.ethernet);
       if (!onWifi || !mounted) return;
@@ -127,7 +133,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   }
 
   String _formatSavedCall(EmergencyCall call) {
-    final shortId = call.id.length > 8 ? '${call.id.substring(0, 8)}…' : call.id;
+    final shortId =
+        call.id.length > 8 ? '${call.id.substring(0, 8)}…' : call.id;
     final lat = call.latitude?.toString() ?? 'not set';
     final long = call.longitude?.toString() ?? 'not set';
     final accuracy = call.locationAccuracy == null
@@ -142,14 +149,20 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       if (!mounted) return location;
       setState(() {
         _currentLocation = location;
+        _locationError = null;
         _latitudeController.text = location.latitude.toStringAsFixed(7);
         _longitudeController.text = location.longitude.toStringAsFixed(7);
-        _statusMessage = 'GPS location captured (±${location.accuracy.toStringAsFixed(1)} m).';
+        _statusMessage =
+            'GPS location captured (±${location.accuracy.toStringAsFixed(1)} m).';
       });
       return location;
     } catch (error) {
       if (mounted) {
-        setState(() => _statusMessage = 'GPS unavailable; submitting without live location. $error');
+        setState(() {
+          _locationError = error.toString();
+          _statusMessage =
+              'GPS unavailable; submitting without live location. $error';
+        });
       }
       return null;
     }
@@ -170,7 +183,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
 
   void _logLanguageContext() {
     final apiLanguage = _resolveApiLanguage();
-    debugPrint('[EmergencyIQ] Selected language: ${_selectedLanguage.displayName}');
+    debugPrint(
+        '[EmergencyIQ] Selected language: ${_selectedLanguage.displayName}');
     debugPrint(
       '[EmergencyIQ] STT locale: ${_activeSttLocale?.localeId ?? 'unavailable'}',
     );
@@ -262,6 +276,9 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       path: filePath,
     );
 
+    debugPrint(
+        '[EmergencyIQ] Recording started path=$filePath format=m4a mime=audio/mp4');
+
     setState(() {
       _isRecording = true;
       _audioPath = filePath;
@@ -273,12 +290,22 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     if (!_isRecording) return;
 
     final savedPath = await _record.stop();
+    final resolvedPath = savedPath ?? _audioPath;
+    final exists = resolvedPath != null && await File(resolvedPath).exists();
+    final size =
+        resolvedPath == null || !exists ? 0 : await File(resolvedPath).length();
+    debugPrint(
+      '[EmergencyIQ] Recording stopped path=$resolvedPath exists=$exists '
+      'sizeBytes=$size extension=${resolvedPath == null ? 'unknown' : path.extension(resolvedPath)}',
+    );
     setState(() {
       _isRecording = false;
-      _audioPath = savedPath ?? _audioPath;
+      _audioPath = resolvedPath;
       _statusMessage = _audioPath == null
           ? 'Audio recording stopped, but no file was created.'
-          : 'Audio saved to ${path.basename(_audioPath!)}';
+          : size <= 0
+              ? 'Audio recording is empty or could not be captured. Please record again.'
+              : 'Audio saved to ${path.basename(_audioPath!)} ($size bytes)';
     });
   }
 
@@ -306,12 +333,30 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       final call = await EmergencyApiService().submitTextEmergency(
         text: text,
         language: language!,
-        latitude: location?.latitude ?? _parseCoordinate(_latitudeController.text),
-        longitude: location?.longitude ?? _parseCoordinate(_longitudeController.text),
+        latitude:
+            location?.latitude ?? _parseCoordinate(_latitudeController.text),
+        longitude:
+            location?.longitude ?? _parseCoordinate(_longitudeController.text),
         locationAccuracy: location?.accuracy ?? _currentLocation?.accuracy,
         locationTimestamp: location?.timestamp ?? _currentLocation?.timestamp,
+        clientMetadata: {
+          'platform': 'flutter',
+          'map_snapshot_status': _mapSnapshotStatus,
+          if (_locationError != null) 'location_error': _locationError,
+        },
       );
       _lastSavedCall = call;
+      if (_mapSnapshot != null) {
+        try {
+          _lastSavedCall = await EmergencyApiService().attachMapSnapshot(
+            callId: call.id,
+            bytes: _mapSnapshot!,
+          );
+          _mapSnapshotStatus = 'Map snapshot stored with incident';
+        } catch (error) {
+          _mapSnapshotStatus = 'Map snapshot unavailable: $error';
+        }
+      }
       _showMessage(_formatSavedCall(call));
       _textController.clear();
     } catch (error) {
@@ -332,6 +377,19 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       _showMessage('Audio file is missing. Please record again.');
       return;
     }
+    final fileSize = await file.length();
+    if (fileSize <= 0) {
+      _showMessage(
+          'Audio recording is empty or could not be captured. Please record again.');
+      return;
+    }
+    final audioBytes = await file.readAsBytes();
+    debugPrint(
+      '[EmergencyIQ] Upload preparation path=${file.path} exists=true '
+      'sizeBytes=$fileSize bytesRead=${audioBytes.length} '
+      'extension=${path.extension(file.path)} mime=audio/mp4 multipartField=file '
+      'filename=${path.basename(file.path)}',
+    );
 
     final transcription = _textController.text.trim();
     final language = _resolveApiLanguage();
@@ -354,16 +412,22 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
           audioFile: file,
           transcription: transcription,
           language: language!,
-          latitude: location?.latitude ?? _parseCoordinate(_latitudeController.text),
-          longitude: location?.longitude ?? _parseCoordinate(_longitudeController.text),
+          latitude:
+              location?.latitude ?? _parseCoordinate(_latitudeController.text),
+          longitude: location?.longitude ??
+              _parseCoordinate(_longitudeController.text),
           locationAccuracy: location?.accuracy ?? _currentLocation?.accuracy,
           locationTimestamp: location?.timestamp ?? _currentLocation?.timestamp,
           clientMetadata: {
             'platform': 'flutter',
+            'map_snapshot_status': _mapSnapshotStatus,
             'recorded_at': DateTime.now().toIso8601String(),
             'selected_language': _selectedLanguage.displayName,
             'stt_locale': _activeSttLocale?.localeId,
+            if (_locationError != null) 'location_error': _locationError,
           },
+          mapSnapshot: _mapSnapshot,
+          audioBytes: audioBytes,
         );
         _lastSavedCall = call;
         _showMessage(_formatSavedCall(call));
@@ -372,10 +436,21 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         final call = await service.submitAudioEmergency(
           audioFile: file,
           language: language!,
-          latitude: location?.latitude ?? _parseCoordinate(_latitudeController.text),
-          longitude: location?.longitude ?? _parseCoordinate(_longitudeController.text),
+          latitude:
+              location?.latitude ?? _parseCoordinate(_latitudeController.text),
+          longitude: location?.longitude ??
+              _parseCoordinate(_longitudeController.text),
           locationAccuracy: location?.accuracy ?? _currentLocation?.accuracy,
           locationTimestamp: location?.timestamp ?? _currentLocation?.timestamp,
+          clientMetadata: {
+            'platform': 'flutter',
+            'map_snapshot_status': _mapSnapshotStatus,
+            'recorded_at': DateTime.now().toIso8601String(),
+            'selected_language': _selectedLanguage.displayName,
+            if (_locationError != null) 'location_error': _locationError,
+          },
+          mapSnapshot: _mapSnapshot,
+          audioBytes: audioBytes,
         );
         _lastSavedCall = call;
         _showMessage(
@@ -404,10 +479,70 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     );
   }
 
+  Future<void> _openCallerLocation() async {
+    final snapshot = await Navigator.of(context).push<Uint8List>(
+      MaterialPageRoute(
+        builder: (context) => MapScreen(
+          initialLocation: _currentLocation,
+          title: 'Caller Location',
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      if (snapshot == null || snapshot.isEmpty) {
+        _mapSnapshotStatus = 'Unable to capture map';
+      } else {
+        _mapSnapshot = snapshot;
+        _mapSnapshotStatus = 'Map snapshot available';
+      }
+    });
+  }
+
+  Widget _buildLocationPreview() {
+    final location = _currentLocation;
+    if (location == null) return const SizedBox.shrink();
+    return Card(
+      color: AppColors.cardBackground,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Emergency location',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Text('Location status: captured'),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 220,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: _mapSnapshot == null
+                    ? Container(
+                        color: Colors.grey.shade200,
+                        alignment: Alignment.center,
+                        child: Text(_mapSnapshotStatus),
+                      )
+                    : Image.memory(_mapSnapshot!, fit: BoxFit.cover),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+                'Latitude: ${location.latitude}\nLongitude: ${location.longitude}'),
+            Text('GPS accuracy: ${location.accuracy.toStringAsFixed(1)} m'),
+            Text(_mapSnapshotStatus),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,6 +552,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          readOnly: readOnly,
           maxLines: keyboardType == TextInputType.multiline ? 5 : 1,
           decoration: InputDecoration(
             filled: true,
@@ -447,7 +583,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(color: AppColors.border),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           ),
           items: EmergencyLanguageOption.all
               .map(
@@ -518,15 +655,20 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
               if (!kIsWeb) ...[
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
-                  icon: Icon(_isListening ? Icons.stop_circle_outlined : Icons.mic_none),
-                  label: Text(_isListening ? 'Stop Listening' : 'Speak Emergency (STT)'),
+                  icon: Icon(_isListening
+                      ? Icons.stop_circle_outlined
+                      : Icons.mic_none),
+                  label: Text(_isListening
+                      ? 'Stop Listening'
+                      : 'Speak Emergency (STT)'),
                   onPressed: _isSubmitting
                       ? null
                       : _isListening
                           ? _stopListening
                           : _startListening,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isListening ? AppColors.dangerRed : AppColors.primary,
+                    backgroundColor:
+                        _isListening ? AppColors.dangerRed : AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -536,17 +678,19 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                 children: [
                   Expanded(
                     child: _buildTextField(
-                      label: 'Latitude (optional)',
+                      label: 'Latitude',
                       controller: _latitudeController,
                       keyboardType: TextInputType.number,
+                      readOnly: true,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildTextField(
-                      label: 'Longitude (optional)',
+                      label: 'Longitude',
                       controller: _longitudeController,
                       keyboardType: TextInputType.number,
+                      readOnly: true,
                     ),
                   ),
                 ],
@@ -561,7 +705,24 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                         await _locationForSubmission();
                       },
               ),
+              const SizedBox(height: 10),
+              if (_currentLocation != null)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.map),
+                  label: const Text('View location on map'),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () {
+                          _openCallerLocation();
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
               const SizedBox(height: 20),
+              _buildLocationPreview(),
+              const SizedBox(height: 4),
               ElevatedButton.icon(
                 icon: const Icon(Icons.send_rounded),
                 label: const Text('Submit Text Emergency'),
@@ -589,16 +750,21 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        icon: Icon(_isRecording ? Icons.stop_rounded : Icons.mic_rounded),
-                        label: Text(_isRecording ? 'Stop Recording' : 'Start Recording'),
+                        icon: Icon(_isRecording
+                            ? Icons.stop_rounded
+                            : Icons.mic_rounded),
+                        label: Text(_isRecording
+                            ? 'Stop Recording'
+                            : 'Start Recording'),
                         onPressed: _isSubmitting
                             ? null
                             : _isRecording
                                 ? _stopRecording
                                 : _startRecording,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              _isRecording ? AppColors.dangerRed : AppColors.primary,
+                          backgroundColor: _isRecording
+                              ? AppColors.dangerRed
+                              : AppColors.primary,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                       ),
@@ -639,7 +805,10 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                 ),
               if (_lastSavedCall != null) ...[
                 const SizedBox(height: 18),
-                EmergencyLocationCard(call: _lastSavedCall!),
+                EmergencyLocationCard(
+                  call: _lastSavedCall!,
+                  mapSnapshot: _mapSnapshot,
+                ),
               ],
             ],
           ),
