@@ -8,7 +8,7 @@ from ..core.logger import get_logger
 
 logger = get_logger("app.services.ollama_client")
 
-DEFAULT_TIMEOUT_SECONDS = 60.0
+DEFAULT_TIMEOUT_SECONDS = 120.0
 
 
 class OllamaClient:
@@ -19,12 +19,16 @@ class OllamaClient:
         base_url: str | None = None,
         model: str | None = None,
         encoding_model: str | None = None,
-        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        timeout: float | None = None,
     ) -> None:
         self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or getattr(settings, "OLLAMA_DECODING_MODEL", None) or settings.OLLAMA_MODEL
         self.encoding_model = encoding_model or getattr(settings, "OLLAMA_ENCODING_MODEL", None) or "kimi"
-        self.timeout = timeout
+        self.timeout = (
+            timeout
+            if timeout is not None
+            else getattr(settings, "OLLAMA_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+        )
 
     async def generate_json(self, system_prompt: str, user_prompt: str) -> str:
         """
@@ -43,6 +47,12 @@ class OllamaClient:
             ],
         }
 
+        logger.info(
+            "Ollama model request start base_url=%s model=%s timeout=%.0fs",
+            self.base_url,
+            self.model,
+            self.timeout,
+        )
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload)
@@ -65,6 +75,11 @@ class OllamaClient:
         if not isinstance(content, str) or not content.strip():
             raise OllamaUnavailableError("Ollama returned empty analysis content")
 
+        logger.info(
+            "Ollama model response received http_status=%d content_length=%d",
+            response.status_code,
+            len(content),
+        )
         return content.strip()
 
     async def embed(self, input_text: str | list[str]) -> list[list[float]]:

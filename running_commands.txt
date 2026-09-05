@@ -3,5 +3,5 @@ flutter run
 python main.py
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 npm run dev 
-http://localhost:8000/docs - swagger
+http://localhost:8000/docs - swagger- FASTAPI 
 .venv\Scripts\activate

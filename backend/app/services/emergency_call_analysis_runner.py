@@ -45,6 +45,7 @@ async def run_post_create_analysis(
 
     service = analysis_service or EmergencyAnalysisService()
     emergency.status = STATUS_ANALYZING
+    logger.info("Emergency analysis status=analyzing emergency_id=%s", emergency.id)
 
     try:
         await db.commit()
@@ -63,6 +64,12 @@ async def run_post_create_analysis(
         return emergency
 
     result = await service.analyze(build_analysis_input(emergency))
+    logger.info(
+        "Emergency analysis completed emergency_id=%s success=%s failure_code=%s",
+        emergency.id,
+        result.success,
+        result.failure_code,
+    )
     emergency.client_metadata = result.to_client_metadata_patch(emergency.client_metadata)
     if result.suggested_status:
         emergency.status = result.suggested_status
@@ -72,6 +79,11 @@ async def run_post_create_analysis(
     try:
         await db.commit()
         await db.refresh(emergency)
+        logger.info(
+            "Emergency analysis database update complete emergency_id=%s status=%s",
+            emergency.id,
+            emergency.status,
+        )
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception(

@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = 'qwen2.5:0.5b'
     OLLAMA_DECODING_MODEL: str = 'qwen2.5:0.5b'
     OLLAMA_ENCODING_MODEL: str = 'kimi'
+    # Cold-starting a local model can take longer than a normal generation.
+    OLLAMA_TIMEOUT_SECONDS: float = 120.0
 
     # Optional local geospatial enrichment. Never use a public runtime service.
     NOMINATIM_URL: str = 'http://localhost:8080'

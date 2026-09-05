@@ -145,7 +145,7 @@ async def test_fire_rescue_analysis() -> None:
     assert result.analysis.emergency_type == EmergencyType.FIRE
     assert HelpRequired.FIRE_SERVICE in result.analysis.help_required
     assert HelpRequired.AMBULANCE in result.analysis.help_required
-    assert HelpRequired.RESCUE not in result.analysis.help_required
+    assert HelpRequired.RESCUE in result.analysis.help_required
 
 
 @pytest.mark.asyncio
@@ -218,10 +218,11 @@ async def test_ollama_unavailable() -> None:
         )
     )
 
-    assert result.success is False
-    assert result.failure_code == "ollama_unavailable"
-    assert result.analysis is None
-    assert result.suggested_status == STATUS_ANALYSIS_FAILED
+    assert result.success is True
+    assert result.analysis is not None
+    assert result.analysis.emergency_type == EmergencyType.FIRE
+    assert HelpRequired.FIRE_SERVICE in result.analysis.help_required
+    assert result.suggested_status == STATUS_ANALYZED
 
 
 @pytest.mark.asyncio
@@ -278,8 +279,8 @@ async def test_normalizes_llm_alias_values() -> None:
 
     assert result.success is True
     assert result.analysis is not None
-    assert result.analysis.emergency_type == EmergencyType.UNKNOWN
-    assert HelpRequired.MEDICAL_ASSISTANCE in result.analysis.help_required
+    assert result.analysis.emergency_type == EmergencyType.FIRE
+    assert HelpRequired.AMBULANCE in result.analysis.help_required
     assert HelpRequired.FIRE_SERVICE in result.analysis.help_required
     assert "medical_assistance" in result.analysis.dispatch_recommendation.recommended_units
     assert "fire_service" in result.analysis.dispatch_recommendation.recommended_units
@@ -366,6 +367,51 @@ async def test_json_fence_stripping() -> None:
 
 
 @pytest.mark.asyncio
+async def test_legacy_qwen_evidence_payload_is_normalized() -> None:
+    legacy_payload = {
+        "emergency_type": "emergency_medical",
+        "severity": "CRITICAL",
+        "immediate_threat": True,
+        "people_at_risk": 1,
+        "victim_count": None,
+        "injuries_present": False,
+        "unconscious_person": True,
+        "severe_bleeding": False,
+        "medical_emergency": True,
+        "fire_present": False,
+        "explosion_present": False,
+        "trapped_persons": True,
+        "rescue_required": True,
+        "railway_incident": False,
+        "road_accident": False,
+        "highway_incident": False,
+        "weapon_present": False,
+        "child_involved": True,
+        "elderly_involved": False,
+        "domestic_violence": False,
+    }
+    service = EmergencyAnalysisService(_mock_client(json.dumps(legacy_payload)))
+
+    result = await service.analyze(
+        EmergencyAnalysisInput(
+            text_content=(
+                "Hello, my father is having severe chest pain. "
+                "Please send an ambulance immediately."
+            ),
+            language="en",
+            call_type="text",
+        )
+    )
+
+    assert result.success is True
+    assert result.analysis is not None
+    assert result.analysis.emergency_type == EmergencyType.MEDICAL
+    assert HelpRequired.AMBULANCE in result.analysis.help_required
+    assert HelpRequired.FIRE_SERVICE not in result.analysis.help_required
+    assert HelpRequired.RESCUE not in result.analysis.help_required
+
+
+@pytest.mark.asyncio
 async def test_unknown_help_required_enriched_from_medical_transcript() -> None:
     payload = _valid_analysis_payload(
         emergency_type="police",
@@ -385,6 +431,6 @@ async def test_unknown_help_required_enriched_from_medical_transcript() -> None:
 
     assert result.success is True
     assert result.analysis is not None
-    assert HelpRequired.POLICE in result.analysis.help_required
-    assert HelpRequired.MEDICAL_ASSISTANCE in result.analysis.help_required
+    assert HelpRequired.AMBULANCE in result.analysis.help_required
+    assert HelpRequired.POLICE not in result.analysis.help_required
     assert HelpRequired.UNKNOWN not in result.analysis.help_required

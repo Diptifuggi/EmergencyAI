@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 class EmergencyType(str, Enum):
+    CRIME_POLICE = "crime_police"
     MEDICAL = "medical"
     POLICE = "police"
     FIRE = "fire"
@@ -14,6 +15,8 @@ class EmergencyType(str, Enum):
     WOMEN_SAFETY = "women_safety"
     DOMESTIC_VIOLENCE = "domestic_violence"
     CHILD_SAFETY = "child_safety"
+    CYBERCRIME = "cybercrime"
+    LPG = "lpg"
     ROBBERY = "robbery"
     ASSAULT = "assault"
     HARASSMENT = "harassment"
@@ -30,6 +33,8 @@ class HelpRequired(str, Enum):
     MEDICAL_ASSISTANCE = "medical_assistance"
     WOMEN_SAFETY_SUPPORT = "women_safety_support"
     CHILD_PROTECTION = "child_protection"
+    CYBERCRIME = "cybercrime"
+    LPG = "lpg"
     MULTIPLE_SERVICES = "multiple_services"
     UNKNOWN = "unknown"
 
@@ -68,13 +73,18 @@ class EmergencyAnalysisInput(BaseModel):
         return (self.text_content or self.transcription or "").strip()
 
     def resolved_language(self) -> str:
-        return (self.language or "en").strip().lower() or "en"
+        value = (self.language or "en").strip().lower() or "en"
+        return value.replace("_", "-").split("-", 1)[0]
 
 
 class DispatchRecommendation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     recommended_units: list[str] = Field(default_factory=list, max_length=10)
+    emergency_numbers: dict[str, Any] = Field(default_factory=dict)
+    reason: str = ""
+    priority_reason: str = ""
+    dispatcher_action: str = ""
 
     @field_validator("recommended_units")
     @classmethod
@@ -88,6 +98,7 @@ class EmergencyAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     emergency_type: EmergencyType
+    sub_type: str | None = None
     severity: AnalysisLevel = AnalysisLevel.MEDIUM
     help_required: list[HelpRequired] = Field(default_factory=list, max_length=10)
     emergency_keywords: list[str] = Field(default_factory=list, max_length=20)
@@ -99,6 +110,40 @@ class EmergencyAnalysis(BaseModel):
     stress_level: AnalysisLevel
     dispatch_recommendation: DispatchRecommendation
     confidence: float = Field(ge=0.0, le=1.0)
+    victim_count: int | None = Field(default=None, ge=0)
+    injuries_present: bool = False
+    unconscious_person: bool = False
+    severe_bleeding: bool = False
+    medical_emergency: bool = False
+    immediate_danger: bool = False
+    fire_present: bool = False
+    explosion_present: bool = False
+    trapped_persons: bool = False
+    rescue_required: bool = False
+    railway_incident: bool = False
+    road_accident: bool = False
+    highway_incident: bool = False
+    weapon_present: bool = False
+    child_involved: bool = False
+    elderly_involved: bool = False
+    domestic_violence: bool = False
+    crime_in_progress: bool = False
+    police_required: bool = False
+    sexual_violence: bool = False
+    missing_person: bool = False
+    burglary_in_progress: bool = False
+    home_intrusion: bool = False
+    robbery_in_progress: bool = False
+    assault_in_progress: bool = False
+    smoke_present: bool = False
+    weapon_type: str | None = None
+    children_involved: bool = False
+    cyber_crime: bool = False
+    lpg_leak: bool = False
+    location_description: str | None = None
+    incident_description: str = ""
+    caller_request: str | None = None
+    recommended_units: list[str] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
     def validate_score_levels(self) -> "EmergencyAnalysis":
@@ -158,13 +203,32 @@ class _RawEmergencyAnalysis(BaseModel):
     severity: str | None = None
     immediate_threat: bool = False
     people_at_risk: int = Field(default=0, ge=0)
+    victim_count: int | None = Field(default=None, ge=0)
+    injuries_present: bool = False
+    unconscious_person: bool = False
+    severe_bleeding: bool = False
+    medical_emergency: bool = False
+    fire_present: bool = False
+    explosion_present: bool = False
+    trapped_persons: bool = False
+    rescue_required: bool = False
+    railway_incident: bool = False
+    road_accident: bool = False
+    highway_incident: bool = False
+    weapon_present: bool = False
+    child_involved: bool = False
+    elderly_involved: bool = False
+    domestic_violence: bool = False
     help_required: list[str] = Field(default_factory=list)
     emergency_keywords: list[str] = Field(default_factory=list)
     priority_score: int = 0
     priority_level: str = "MEDIUM"
-    panic_score: int
-    panic_level: str
-    stress_score: int
-    stress_level: str
-    dispatch_recommendation: dict[str, Any]
-    confidence: float
+    # Qwen2.5:0.5b sometimes returns the older evidence-only payload. These
+    # neutral defaults keep that payload safe to process; dispatch decisions
+    # and scores are still derived by the backend policy.
+    panic_score: int = 0
+    panic_level: str = "LOW"
+    stress_score: int = 0
+    stress_level: str = "LOW"
+    dispatch_recommendation: dict[str, Any] = Field(default_factory=dict)
+    confidence: float = 0.0

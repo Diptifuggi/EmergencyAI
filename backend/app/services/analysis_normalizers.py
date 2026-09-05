@@ -7,6 +7,10 @@ _VALID_HELP_REQUIRED = {item.value for item in HelpRequired}
 _VALID_LEVELS = {item.value for item in AnalysisLevel}
 
 _EMERGENCY_TYPE_ALIASES: dict[str, str] = {
+    "crime": "crime_police",
+    "crime_police": "crime_police",
+    "burglary": "crime_police",
+    "home_intrusion": "crime_police",
     "woman_safety": "women_safety",
     "women_safety": "women_safety",
     "domestic_violence": "domestic_violence",
@@ -16,6 +20,12 @@ _EMERGENCY_TYPE_ALIASES: dict[str, str] = {
     "road_accident": "accident",
     "car_accident": "accident",
     "medical_emergency": "medical",
+    "emergency_medical": "medical",
+    "cyber_crime": "cybercrime",
+    "cyber_fraud": "cybercrime",
+    "gas_leak": "lpg",
+    "lpg_leak": "lpg",
+    "missing_child": "child_safety",
     "theft": "robbery",
     "general": "other",
     "none": "unknown",
