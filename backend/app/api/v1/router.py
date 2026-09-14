@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import health, auth, users, calls, incidents, uploads, transcripts, emergency_calls
+from . import health, auth, users, calls, incidents, uploads, transcripts, emergency_calls, stt
 
 api_router = APIRouter()
 
@@ -12,3 +12,4 @@ api_router.include_router(incidents.router, prefix="/incidents", tags=["incident
 api_router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 api_router.include_router(transcripts.router, prefix="/transcripts", tags=["transcripts"])
 api_router.include_router(emergency_calls.router, prefix="/emergency-calls", tags=["emergency-calls"])
+api_router.include_router(stt.router, prefix="/stt", tags=["stt"])

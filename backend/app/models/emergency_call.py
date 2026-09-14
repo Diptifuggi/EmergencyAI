@@ -78,3 +78,8 @@ class EmergencyCall(Base):
     @property
     def map_snapshot_available(self) -> bool:
         return bool(self.map_snapshot_file_path)
+
+    @property
+    def requested_language(self) -> str | None:
+        metadata = self.client_metadata or {}
+        return metadata.get("requested_language") or self.language

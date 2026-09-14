@@ -21,7 +21,6 @@ from ..schemas.emergency_analysis import (
 )
 from .analysis_normalizers import normalize_emergency_type
 from .emergency_keywords import evidence
-from .emergency_service_directory import emergency_contacts_for_services
 from .incident_rules import extract_incident_facts, services_for_facts
 from .ollama_client import OllamaClient
 from .scoring_policy import (
@@ -38,6 +37,8 @@ logger = get_logger("app.services.emergency_analysis_service")
 
 
 def _dispatch_reason(facts) -> str:
+    if not facts.current_emergency:
+        return f"No dispatch recommendation: the report is {facts.context_state}."
     if facts.burglary_in_progress:
         return "Caller reports an active home intrusion/burglary and requests police assistance."
     if facts.medical_emergency:
@@ -46,6 +47,10 @@ def _dispatch_reason(facts) -> str:
         return "Caller reports fire or explosion evidence based on the provided information."
     if facts.road_accident:
         return "Caller reports a road accident based on the provided information."
+    if facts.railway_incident:
+        details = f" involving {facts.victim_count} injured people" if facts.victim_count is not None else ""
+        request = " and requests assistance" if facts.caller_request else ""
+        return f"Caller reports a railway/train accident{details}{request}."
     if facts.cyber_crime:
         return "Caller reports suspected online or cyber fraud based on the provided information."
     return "Based on the provided information, recommended units require human dispatcher confirmation."
@@ -63,7 +68,15 @@ def _priority_reason(facts) -> str:
         reasons.append("fire or explosion evidence")
     if facts.trapped_persons:
         reasons.append("trapped persons")
-    return "Priority based on " + ", ".join(reasons) + "." if reasons else "Limited explicit urgency evidence."
+    if facts.victim_count is not None:
+        reasons.append(f"{facts.victim_count} explicitly injured people")
+    if facts.injuries_present:
+        reasons.append("explicit injury evidence")
+    if facts.caller_request:
+        reasons.append("caller requests assistance")
+    if not reasons:
+        return "No explicit urgency evidence detected."
+    return "Priority based on " + ", ".join(reasons) + "."
 
 SYSTEM_PROMPT = """You are EmergencyIQ, an emergency dispatch triage assistant.
 Analyze ONLY the supplied emergency transcript text. Do not invent facts not present in the transcript.
@@ -280,7 +293,7 @@ class EmergencyAnalysisService:
         try:
             facts = extract_incident_facts(transcript, language)
             emergency_type = EmergencyType(facts.emergency_type)
-            if emergency_type == EmergencyType.UNKNOWN:
+            if emergency_type == EmergencyType.UNKNOWN and not facts.non_live_context:
                 # Preserve useful legacy LLM classification for non-emergency
                 # reports while keeping deterministic facts authoritative when
                 # the transcript contains an actual incident.
@@ -299,38 +312,15 @@ class EmergencyAnalysisService:
                 people_at_risk=0,
                 transcript=transcript,
                 language=language,
+                victim_count=facts.victim_count,
+                caller_request=facts.caller_request is not None,
             )
             priority_level = level_for_score(priority_score)
-            confidence = min(0.95, 0.55 + 0.08 * sum(
-                bool(value) for value in (
-                    facts.police_required, facts.medical_emergency, facts.fire_present,
-                    facts.home_intrusion, facts.road_accident, facts.cyber_crime,
-                    facts.lpg_leak, facts.trapped_persons, facts.weapon_present,
-                )
-            ))
-            if facts.burglary_in_progress or facts.home_intrusion:
-                confidence = 0.90
-            elif facts.medical_emergency or facts.fire_present or facts.road_accident:
-                confidence = max(confidence, 0.82)
-            emergency_numbers = emergency_contacts_for_services(
-                [
-                    "police" if item == HelpRequired.POLICE else
-                    "ambulance" if item == HelpRequired.AMBULANCE else
-                    "fire_service" if item == HelpRequired.FIRE_SERVICE else
-                    "women_safety_support" if item == HelpRequired.WOMEN_SAFETY_SUPPORT else
-                    "child_protection" if item == HelpRequired.CHILD_PROTECTION else
-                    "cybercrime" if item == HelpRequired.CYBERCRIME else
-                    "lpg" if item == HelpRequired.LPG else "rescue"
-                    for item in help_required
-                ],
-                serious=priority_level in {level_for_score(51), level_for_score(76)},
-            )
-            if facts.railway_incident:
-                emergency_numbers["139"] = "Railway Assistance"
-            if facts.road_accident:
-                emergency_numbers["1073"] = "Road Accident Assistance"
-            if facts.elderly_involved:
-                emergency_numbers["14567"] = "Senior Citizen Helpline"
+            # No calibrated model probability is available. Keep this
+            # compatibility field explicitly uncalibrated rather than presenting
+            # a hand-written score as statistical confidence.
+            confidence = 0.0
+            emergency_numbers = emergency_numbers_for_help(help_required)
             reason = _dispatch_reason(facts)
             logger.info("[EmergencyIQ] Incident type detected: %s", emergency_type.value)
             logger.info("[EmergencyIQ] Priority calculated: %s", priority_level.value)
@@ -339,8 +329,10 @@ class EmergencyAnalysisService:
             logger.info("[EmergencyIQ] Emergency numbers: %s", ", ".join(emergency_numbers) or "none")
             # These remain model-extracted textual indicators, but are bounded
             # and categorised by backend policy rather than LLM labels.
-            panic_score = clamp_score(raw.panic_score)
-            stress_score = clamp_score(raw.stress_score)
+            # The project has no validated text/acoustic emotion model. Raw LLM
+            # panic/stress values are therefore never promoted to public scores.
+            panic_score = 0
+            stress_score = 0
 
             return EmergencyAnalysis(
                 emergency_type=emergency_type,
@@ -362,7 +354,15 @@ class EmergencyAnalysisService:
                     "dispatcher_action": "AI recommendation - human dispatcher confirmation required. Verify caller location and dispatch appropriate resources.",
                 },
                 confidence=confidence,
-                victim_count=facts.victim_count or raw.victim_count,
+                context_state=facts.context_state,
+                current_emergency=facts.current_emergency,
+                hypothetical=facts.hypothetical,
+                historical=facts.historical,
+                resolved=facts.resolved,
+                uncertain=facts.uncertain,
+                negated=facts.negated,
+                victim_count=facts.victim_count,
+                victim_count_approximate=facts.victim_count_approximate,
                 injuries_present=validated_injuries,
                 unconscious_person=facts.unconscious_person,
                 severe_bleeding=facts.severe_bleeding,
@@ -392,6 +392,7 @@ class EmergencyAnalysisService:
                 children_involved=facts.children_involved,
                 cyber_crime=facts.cyber_crime,
                 lpg_leak=facts.lpg_leak,
+                location_description=facts.location_description,
                 caller_request=facts.caller_request,
                 recommended_units=dispatch_units,
                 incident_description=transcript,

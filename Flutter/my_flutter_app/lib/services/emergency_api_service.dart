@@ -40,7 +40,7 @@ class EmergencyApiService {
     final response = await http.Response.fromStream(await request.send());
     if (response.statusCode != 200) {
       throw ApiException(
-        'Map snapshot upload failed (${response.statusCode}): ${response.body}',
+        _backendError(response, 'Unable to upload the map snapshot.'),
       );
     }
     return EmergencyCall.fromJson(
@@ -52,10 +52,82 @@ class EmergencyApiService {
     final canonical = LanguageMapper.toApiCode(language);
     if (!LanguageMapper.isValidApiCode(canonical)) {
       throw ApiException(
-        'Invalid EmergencyIQ language "$language". Expected en, hi, gu, or mr.',
+        'Invalid EmergencyIQ language "$language". Expected auto, en, hi, gu, or mr.',
       );
     }
     return canonical!;
+  }
+
+  Future<SarvamTranscription> transcribeAudio({
+    required File audioFile,
+    required String language,
+    Uint8List? audioBytes,
+  }) async {
+    final baseUrl = await ApiClient.getBaseUrl();
+    final uri = Uri.parse('$baseUrl/api/v1/stt/transcribe');
+    final exists = await audioFile.exists();
+    final request = http.MultipartRequest(
+      'POST',
+      uri,
+    )..fields['language_code'] = _sarvamLanguageCode(language);
+    final payload = audioBytes ?? await audioFile.readAsBytes();
+    if (payload.isEmpty) {
+      throw ApiException('Audio recording is empty. Please record again.');
+    }
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      payload,
+      filename: audioFile.path.split(Platform.pathSeparator).last,
+      contentType: _audioMediaType(audioFile.path),
+    ));
+    debugPrint(
+      '[STT] Starting upload file=${audioFile.path.split(Platform.pathSeparator).last} '
+      'exists=$exists sizeBytes=${payload.length} language=${request.fields['language_code']} '
+      'url=$uri contentType=${_audioMediaType(audioFile.path)} multipartField=file',
+    );
+    debugPrint('[LANG] Sarvam language_code=${request.fields['language_code']}');
+    final response = await http.Response.fromStream(await request.send());
+    debugPrint('[STT] HTTP Status: ${response.statusCode}');
+    debugPrint('[STT] Response: ${response.body}');
+    if (response.statusCode != 200) {
+      throw ApiException(_backendError(response, 'Unable to transcribe audio. Please try again.'));
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final result = SarvamTranscription.fromJson(body);
+    if (result.transcript.trim().isEmpty) {
+      throw ApiException('No speech was detected. Please record a clearer message.');
+    }
+    debugPrint('[LANG] detected language=${result.language ?? 'unknown'}');
+    return result;
+  }
+
+  String _sarvamLanguageCode(String language) {
+    final canonical = LanguageMapper.toApiCode(language);
+    switch (canonical) {
+      case 'en-IN':
+        return 'en-IN';
+      case 'hi-IN':
+        return 'hi-IN';
+      case 'gu-IN':
+        return 'gu-IN';
+      case 'mr-IN':
+        return 'mr-IN';
+      case 'auto':
+        return 'unknown';
+      default:
+        throw ApiException('Please select a supported transcription language.');
+    }
+  }
+
+  String _backendError(http.Response response, String fallback) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final detail = body['detail'];
+      if (detail is String && detail.trim().isNotEmpty) return detail;
+    } catch (_) {
+      // Keep server internals out of the user-facing message.
+    }
+    return fallback;
   }
 
   Future<EmergencyCall> submitTextEmergency({
@@ -88,9 +160,10 @@ class EmergencyApiService {
     );
 
     if (response.statusCode != 201) {
-      throw ApiException(
-        'Text emergency submission failed (${response.statusCode}): ${response.body}',
-      );
+      throw ApiException(_backendError(
+        response,
+        'Unable to submit the emergency message. Please try again.',
+      ));
     }
 
     final call = EmergencyCall.fromJson(
@@ -162,9 +235,10 @@ class EmergencyApiService {
         '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} responseStatus=${response.statusCode}');
 
     if (response.statusCode != 201) {
-      throw ApiException(
-        'Voice+text submission failed (${response.statusCode}): ${response.body}',
-      );
+      throw ApiException(_backendError(
+        response,
+        'Unable to submit the voice emergency. Please try again.',
+      ));
     }
 
     final call = EmergencyCall.fromJson(
@@ -237,9 +311,10 @@ class EmergencyApiService {
         '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} responseStatus=${response.statusCode}');
 
     if (response.statusCode != 201) {
-      throw ApiException(
-        'Audio emergency submission failed (${response.statusCode}): ${response.body}',
-      );
+      throw ApiException(_backendError(
+        response,
+        'Unable to submit the audio emergency. Please try again.',
+      ));
     }
 
     final call = EmergencyCall.fromJson(
@@ -284,9 +359,10 @@ class EmergencyApiService {
     );
 
     if (response.statusCode != 200) {
-      throw ApiException(
-        'Failed to list emergencies (${response.statusCode}): ${response.body}',
-      );
+      throw ApiException(_backendError(
+        response,
+        'Unable to load emergency reports. Please try again.',
+      ));
     }
 
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -294,6 +370,35 @@ class EmergencyApiService {
         .map((e) => EmergencyCall.fromJson(e as Map<String, dynamic>))
         .toList();
     return items;
+  }
+}
+
+class SarvamTranscription {
+  const SarvamTranscription({
+    required this.transcript,
+    required this.language,
+    required this.provider,
+    required this.model,
+    required this.timestamp,
+    required this.metadata,
+  });
+
+  final String transcript;
+  final String? language;
+  final String provider;
+  final String model;
+  final String timestamp;
+  final Map<String, dynamic> metadata;
+
+  factory SarvamTranscription.fromJson(Map<String, dynamic> json) {
+    return SarvamTranscription(
+      transcript: (json['transcript'] as String? ?? '').trim(),
+      language: json['language'] as String?,
+      provider: json['provider'] as String? ?? 'sarvam',
+      model: json['model'] as String? ?? 'unknown',
+      timestamp: json['timestamp'] as String? ?? DateTime.now().toUtc().toIso8601String(),
+      metadata: (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
+    );
   }
 }
 

@@ -64,7 +64,9 @@ def calculate_severity_score(*, emergency_type: EmergencyType, transcript: str, 
 
 
 def calculate_priority_score(*, emergency_type: EmergencyType, immediate_threat: bool,
-                             people_at_risk: int, transcript: str, language: str = "en") -> int:
+                             people_at_risk: int, transcript: str, language: str = "en",
+                             victim_count: int | None = None,
+                             caller_request: bool = False) -> int:
     """Calculate normalized decision-support priority from explicit evidence.
 
     Priority starts with deterministic severity. Active threat/urgent request and
@@ -80,6 +82,9 @@ def calculate_priority_score(*, emergency_type: EmergencyType, immediate_threat:
     if emergency_type == EmergencyType.CHILD_SAFETY and flags.get("child_missing"):
         score += 15
     score += min(max(0, people_at_risk), 4) * 5
+    # Explicit-count policy: 10+ victims signals a mass-casualty event.
+    if victim_count is not None:
+        score += 30 if victim_count >= 10 else 20 if victim_count >= 2 else 10
     return clamp_score(score)
 
 
@@ -102,13 +107,10 @@ def calculate_help_required(*, emergency_type: EmergencyType, transcript: str, l
     trapped = flags.get("trapped", False) or flags.get("rescue", False)
     fire = flags.get("fire", False) or flags.get("explosion", False)
     medical = medical_emergency or flags.get("medical", False)
-    major_accident = emergency_type == EmergencyType.ACCIDENT and flags.get("major", False)
     help_required: list[HelpRequired] = []
     if emergency_type in {EmergencyType.POLICE, EmergencyType.WOMEN_SAFETY,
                           EmergencyType.DOMESTIC_VIOLENCE, EmergencyType.CHILD_SAFETY,
                           EmergencyType.ROBBERY, EmergencyType.ASSAULT, EmergencyType.HARASSMENT}:
-        help_required.append(HelpRequired.POLICE)
-    if emergency_type == EmergencyType.ACCIDENT:
         help_required.append(HelpRequired.POLICE)
     if emergency_type == EmergencyType.CYBERCRIME:
         help_required.extend([HelpRequired.POLICE, HelpRequired.CYBERCRIME])
@@ -116,7 +118,7 @@ def calculate_help_required(*, emergency_type: EmergencyType, transcript: str, l
         help_required.append(HelpRequired.LPG)
     if emergency_type == EmergencyType.FIRE or fire:
         help_required.append(HelpRequired.FIRE_SERVICE)
-    if emergency_type == EmergencyType.MEDICAL or medical or injured or major_accident:
+    if emergency_type == EmergencyType.MEDICAL or medical or injured:
         help_required.append(HelpRequired.AMBULANCE)
     if trapped:
         help_required.extend([HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE])

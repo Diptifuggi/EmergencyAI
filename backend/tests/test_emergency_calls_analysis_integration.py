@@ -159,10 +159,8 @@ async def test_create_text_emergency_unsupported_language_failure(
             json={"text": "Need help", "language": "fr"},
         )
 
-    assert response.status_code == 201
-    data = response.json()
-    assert data["status"] == STATUS_ANALYSIS_FAILED
-    assert data["client_metadata"]["emergency_analysis_error"]["code"] == "unsupported_language"
+    assert response.status_code == 422
+    assert "language" in response.json()["detail"]
 
 
 @pytest.mark.asyncio

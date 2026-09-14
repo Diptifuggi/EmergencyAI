@@ -1,20 +1,22 @@
 """Reviewed multilingual evidence vocabulary for deterministic triage."""
 from __future__ import annotations
 
+from .emergency_lexicon import supporting_evidence
+
 KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
     "en": {
-        "accident": ("accident", "crash", "collision", "pile-up", "hit and run", "overturned"),
+        "accident": ("accident", "crash", "collision", "pile-up", "hit and run", "overturned", "aksident", "apghat", "apghaat", "thokar", "takra"),
         "major": ("major", "serious", "severe", "multiple casualties", "mass casualty"),
-        "injury": ("injured", "injury", "wounded", "hurt", "fracture", "broken bone", "burn", "casualties"),
+        "injury": ("injured", "injury", "wounded", "hurt", "fracture", "broken bone", "burn", "casualties", "ghayal", "jakhmi", "jakhmi hain"),
         "bleeding": ("bleeding", "severe bleeding", "blood"),
         "unconscious": ("unconscious", "passed out", "not responding"),
-        "medical": ("medical", "chest pain", "heart pain", "pain in chest", "chest pressure", "cannot breathe", "difficulty breathing", "shortness of breath", "heart attack", "ambulance"),
-        "fire": ("fire", "smoke", "flames", "burning"),
+        "medical": ("medical", "chest pain", "heart pain", "pain in chest", "chest pressure", "cannot breathe", "difficulty breathing", "shortness of breath", "heart attack", "ambulance", "behosh", "saans nahi", "sans nahi"),
+        "fire": ("fire", "flames", "burning"), "smoke": ("smoke",),
         "explosion": ("explosion", "exploded", "blast", "bomb blast"),
         "trapped": ("trapped", "entrapment", "stuck", "cannot escape", "under debris", "vehicle trapped", "train trapped"),
         "rescue": ("rescue", "rescue needed", "people trapped", "technical rescue", "building collapse", "collapsed building", "rubble", "debris"),
-        "railway": ("railway", "railroad", "train", "railway station", "rail station", "platform", "derailment", "railway track"),
-        "road": ("road accident", "car accident", "bike accident", "motorcycle accident", "truck accident", "bus accident", "vehicle collision", "highway accident", "traffic accident", "major collision"),
+        "railway": ("railway", "railroad", "train", "railway station", "rail station", "platform", "derailment", "derailed", "railway track", "train accident", "rail ve station", "train patri"),
+        "road": ("road accident", "car accident", "bike accident", "motorcycle accident", "truck accident", "bus accident", "vehicle collision", "highway accident", "traffic accident", "major collision", "cars collided", "two cars hit", "vehicles crashed"),
         "highway": ("highway", "expressway", "national highway"),
         "police": ("police", "robbery", "theft", "assault", "fight", "violence", "threat", "kidnapping", "missing person", "following me", "being followed"),
         "weapon": ("gun", "pistol", "rifle", "knife", "weapon", "shooting", "gunshot", "firearm", "revolver", "bomb", "armed person"),
@@ -22,27 +24,28 @@ KEYWORDS: dict[str, dict[str, tuple[str, ...]]] = {
         "child_missing": ("child is missing", "missing child", "kid is missing", "son is missing", "daughter is missing"),
         "cybercrime": ("cyber fraud", "online fraud", "online scam", "money stolen online", "bank account hacked", "hacked", "phishing", "cyber crime"),
         "lpg": ("gas leakage", "gas leak", "lpg leak", "lpg cylinder", "gas from my lpg cylinder", "cylinder leak", "cooking gas", "smell gas"),
-        "immediate": ("immediate", "urgent", "help now", "please send", "hurry", "hurry up", "ambulance immediately", "following me", "being followed"),
+        "immediate": ("immediate", "urgent", "help now", "please send", "send help", "hurry", "hurry up", "ambulance immediately", "following me", "being followed", "jaldi", "bachao"),
+        "request": ("help me", "i need help", "send help", "please help", "madad chahiye", "mujhe madad chahiye", "madad bhejo", "ambulance bhejo", "mane madad joie chhe", "madad moklo", "mala madat havi aahe", "madat pathva"),
         "no_injury": ("nobody is injured", "no one is injured", "no injuries", "not injured"),
     },
     "hi": {
-        "accident": ("दुर्घटना", "हादसा", "टक्कर"), "major": ("बड़ी", "गंभीर"), "injury": ("घायल", "चोट", "जख्मी"),
+        "accident": ("दुर्घटना", "हादसा", "हादसे", "अकस्मात", "टक्कर", "भिड़ गए", "भिड़ गई"), "major": ("बड़ी", "गंभीर"), "injury": ("घायल", "घायल हैं", "चोट", "जख्मी"),
         "bleeding": ("खून", "खून बह रहा"), "unconscious": ("बेहोश",), "medical": ("चिकित्सा", "छाती में दर्द", "सांस नहीं"),
-        "fire": ("आग", "धुआं", "जल रहा"), "explosion": ("विस्फोट", "धमाका"), "trapped": ("फंसे", "फंसा", "अटक"),
-        "rescue": ("बचाव",), "railway": ("रेलवे", "ट्रेन", "स्टेशन"), "police": ("पुलिस", "चोरी", "धमकी"),
-        "weapon": ("हथियार", "बंदूक", "चाकू"), "domestic_violence": ("घरेलू हिंसा", "पति मार"), "child_missing": ("बच्चा लापता", "बच्चा गुम"),
+        "fire": ("आग", "जल रहा"), "smoke": ("धुआं",), "explosion": ("विस्फोट", "धमाका"), "trapped": ("फंसे", "फंसा", "अटक"),
+        "rescue": ("बचाव",), "trapped": ("फंसे", "फंसा", "फंस गए", "फंस गया", "अंदर फंसे"), "railway": ("रेलवे", "ट्रेन", "रेल हादसा", "पटरी से उतर", "स्टेशन"), "road": ("सड़क हादसा", "गाड़ी टकर", "गाड़ियां टकर", "हाईवे", "भिड़ गए", "भिड़ गई"), "police": ("पुलिस", "चोरी", "धमकी"),
+        "weapon": ("हथियार", "बंदूक", "चाकू"), "child": ("बच्चा", "बच्चे", "बच्चों", "बालक"), "domestic_violence": ("घरेलू हिंसा", "पति मार"), "child_missing": ("बच्चा लापता", "बच्चा गुम"),
         "cybercrime": ("साइबर अपराध", "ऑनलाइन धोखाधड़ी"), "lpg": ("गैस रिसाव", "सिलेंडर लीक"),
     },
     "gu": {
         "accident": ("અકસ્મત", "અકસ્માત", "ટક્કર"), "major": ("મોટો", "ગંભીર"), "injury": ("ઇજા", "ઘાયલ"),
-        "bleeding": ("લોહી",), "medical": ("તબીબી", "છાતીમાં દુખાવો", "શ્વાસ"), "fire": ("આગ", "ધુમાડો"),
+        "bleeding": ("લોહી",), "medical": ("તબીબી", "છાતીમાં દુખાવો", "શ્વાસ"), "fire": ("આગ",), "smoke": ("ધુમાડો",),
         "explosion": ("વિસ્ફોટ",), "trapped": ("ફસાયેલા", "ફસાયેલ"), "rescue": ("બચાવ",),
         "railway": ("રેલવે", "ટ્રેન", "સ્ટેશન"), "police": ("પોલીસ", "ચોરી", "ધમકી"), "weapon": ("હથિયાર",),
-        "domestic_violence": ("ઘરેલું હિંસા", "પતિ માર"), "child_missing": ("બાળક ગુમ"), "cybercrime": ("સાયબર છેતરપિંડી",), "lpg": ("ગેસ લીક",),
+        "domestic_violence": ("ઘરેલું હિંસા", "પતિ માર"), "child_missing": ("બાળક ગુમ",), "cybercrime": ("સાયબર છેતરપિંડી",), "lpg": ("ગેસ લીક",),
     },
     "mr": {
         "accident": ("अपघात", "धडक"), "major": ("मोठा", "गंभीर"), "injury": ("जखमी", "दुखापत"),
-        "bleeding": ("रक्त",), "medical": ("वैद्यकीय", "छातीत दुखणे", "श्वास"), "fire": ("आग", "धूर"),
+        "bleeding": ("रक्त",), "medical": ("वैद्यकीय", "छातीत दुखणे", "श्वास"), "fire": ("आग",), "smoke": ("धूर",),
         "explosion": ("स्फोट",), "trapped": ("अडकले", "अडकलेले"), "rescue": ("बचाव",),
         "railway": ("रेल्वे", "ट्रेन", "स्थानक"), "police": ("पोलीस", "चोरी", "धमकी"), "weapon": ("शस्त्र",),
         "domestic_violence": ("घरगुती हिंसा", "पती मार"), "child_missing": ("मूल हरवले",), "cybercrime": ("सायबर फसवणूक",), "lpg": ("गॅस गळती",),
@@ -60,14 +63,25 @@ def evidence(text: str, language: str = "en") -> dict[str, bool]:
             for dictionary in dictionaries
             for phrase in dictionary.get(category, ())
         )
+    # The structured lexicon contributes only supporting evidence.  Incident
+    # classification, context state, and dispatch remain deterministic rules.
+    for category, matched in supporting_evidence(text, language).items():
+        result[category] = result.get(category, False) or matched
     return result
 
 
 def _phrase_is_affirmed(text: str, phrase: str) -> bool:
     start = text.find(phrase)
     while start >= 0:
-        context = text[max(0, start - 18):start]
-        if not any(marker in context for marker in ("no ", "nobody is ", "no one is ", "not ", "without ", "never ")):
+        context = text[max(0, start - 36):start]
+        following = text[start + len(phrase):start + len(phrase) + 18]
+        negative_before = (
+            "no ", "nobody is ", "no one is ", "not ", "without ", "never ",
+            "नहीं ", "कोई नहीं", "न कोई", "बिना ", "नही ",
+            "નથી", "નહીં", "नाही", "nahi ", "nahin ", "nathi ",
+        )
+        negative_after = ("नहीं", "नही", "નથી", "નહીં", "नाही", "not")
+        if not any(marker in context for marker in negative_before) and not any(marker in following for marker in negative_after):
             return True
         start = text.find(phrase, start + len(phrase))
     return False

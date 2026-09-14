@@ -1,12 +1,12 @@
-import 'package:speech_to_text/speech_to_text.dart';
-
 import 'emergency_language_option.dart';
 
 /// Converts UI/STT representations into canonical EmergencyIQ API language codes.
 class LanguageMapper {
   LanguageMapper._();
 
-  static const Set<String> validApiCodes = {'en', 'hi', 'gu', 'mr'};
+  static const Set<String> validApiCodes = {
+    'auto', 'en-IN', 'hi-IN', 'gu-IN', 'mr-IN'
+  };
 
   /// Returns canonical API code or null if [raw] cannot be resolved safely.
   ///
@@ -16,7 +16,16 @@ class LanguageMapper {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
 
-    final normalized = trimmed.toLowerCase().replaceAll('_', '-');
+    final normalized = trimmed.replaceAll('_', '-');
+    final lower = normalized.toLowerCase();
+    const primaryToBcp47 = {
+      'en': 'en-IN', 'hi': 'hi-IN', 'gu': 'gu-IN', 'mr': 'mr-IN',
+    };
+    if (lower == 'auto') return 'auto';
+    if (primaryToBcp47.containsKey(lower)) return primaryToBcp47[lower];
+    if (primaryToBcp47.containsKey(lower.split('-').first)) {
+      return primaryToBcp47[lower.split('-').first];
+    }
     if (validApiCodes.contains(normalized)) {
       return normalized;
     }
@@ -27,7 +36,7 @@ class LanguageMapper {
     }
 
     for (final option in EmergencyLanguageOption.all) {
-      if (normalized == option.displayName.toLowerCase()) {
+      if (lower == option.displayName.toLowerCase()) {
         return option.apiCode;
       }
     }
@@ -46,7 +55,10 @@ class LanguageMapper {
   }
 
   static bool isValidApiCode(String? code) {
-    return code != null && validApiCodes.contains(code.trim().toLowerCase());
+    return code != null &&
+      validApiCodes.contains(code.trim() == 'auto'
+        ? 'auto'
+        : code.trim().replaceAll('_', '-'));
   }
 
   /// Resolve API code using selected language first, then optional raw fallback.
@@ -59,45 +71,6 @@ class LanguageMapper {
       return fromSelection;
     }
     return toApiCode(rawFallback);
-  }
-
-  /// Pick the best STT locale for the selected language from device locales.
-  static LocaleName? pickSttLocale(
-    List<LocaleName> locales,
-    EmergencyLanguageOption selected,
-  ) {
-    if (locales.isEmpty) return null;
-
-    bool matches(LocaleName locale) {
-      final localeId = locale.localeId.toLowerCase();
-      final localeName = locale.name.toLowerCase();
-      for (final prefix in selected.sttLocalePrefixes) {
-        final p = prefix.toLowerCase();
-        if (localeId == p ||
-            localeId.startsWith('$p-') ||
-            localeId.startsWith('${p}_') ||
-            localeName.contains(selected.displayName.toLowerCase())) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    final preferred = locales.where(matches).toList();
-    if (preferred.isEmpty) return null;
-
-    preferred.sort((a, b) {
-      int score(LocaleName locale) {
-        final id = locale.localeId.toLowerCase();
-        if (id.contains('_in') || id.contains('-in')) return 0;
-        if (id.startsWith(selected.apiCode)) return 1;
-        return 2;
-      }
-
-      return score(a).compareTo(score(b));
-    });
-
-    return preferred.first;
   }
 
   static bool _looksLikeOpaqueLocaleId(String value) {

@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core.config import BASE_DIR, settings
 from ...core.database import get_db
 from ...core.exceptions import FileTooLargeError, InvalidFileTypeError
+from ...core.language import bcp47_language
 from ...core.logger import get_logger
 from ...models.emergency_call import EmergencyCall
 from ...schemas.emergency_call import (
@@ -43,6 +44,25 @@ from ...services.location_service import reverse_geocode
 
 router = APIRouter()
 logger = get_logger("app.api.v1.emergency_calls")
+
+SUPPORTED_EMERGENCY_LANGUAGES = {"auto", "en", "hi", "gu", "mr"}
+
+
+def _validate_language(language: str) -> str:
+    normalized = language.strip().lower().replace("_", "-")
+    if normalized in {"en-in", "hi-in", "gu-in", "mr-in"}:
+        return normalized
+    if normalized not in SUPPORTED_EMERGENCY_LANGUAGES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="language must be auto, en, hi, gu, or mr",
+        )
+    return normalized if normalized == "auto" else bcp47_language(normalized) or normalized
+
+
+def _persisted_language(language: str) -> str | None:
+    """Persist detected BCP-47 language; auto remains only request metadata."""
+    return None if language == "auto" else bcp47_language(language) or language
 
 UPLOAD_DIR = BASE_DIR / "backend" / "storage" / "audio"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -295,10 +315,13 @@ async def create_text_emergency(
     payload: EmergencyCallTextCreate,
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
+    requested_language = _validate_language(payload.language)
+    metadata = dict(payload.client_metadata or {})
+    metadata.setdefault("requested_language", requested_language)
     emergency = EmergencyCall(
         call_type="text",
         text_content=payload.text,
-        language=payload.language,
+        language=_persisted_language(requested_language),
         latitude=payload.latitude,
         longitude=payload.longitude,
         location_accuracy=payload.location_accuracy,
@@ -307,7 +330,7 @@ async def create_text_emergency(
         location_status=_location_status(payload.latitude, payload.longitude),
         source=payload.source,
         priority=payload.priority,
-        client_metadata=payload.client_metadata,
+        client_metadata=metadata,
         status="received",
     )
 
@@ -352,16 +375,13 @@ async def create_audio_emergency(
     - latitude / longitude / source / priority / client_metadata (optional JSON string)
     """
     _validate_coordinates(latitude, longitude, location_accuracy)
+    requested_language = _validate_language(language)
+    cleaned_language = _persisted_language(requested_language)
     relative_path, original_name, content_type, size_bytes = await _save_audio_file(file)
     snapshot_data = await _save_map_snapshot(map_snapshot) if map_snapshot else None
-    meta = _parse_metadata(client_metadata)
+    meta = _parse_metadata(client_metadata) or {}
+    meta.setdefault("requested_language", requested_language)
     cleaned_transcription = (transcription or "").strip() or None
-    cleaned_language = language.strip()
-    if not cleaned_language:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="language must not be empty",
-        )
 
     status_value = "received" if cleaned_transcription else "pending_transcription"
     emergency = EmergencyCall(
@@ -435,6 +455,8 @@ async def create_voice_and_text_emergency(
 ) -> EmergencyCall:
     """Requires both audio file and its text. Prefer this from the Flutter app."""
     _validate_coordinates(latitude, longitude, location_accuracy)
+    requested_language = _validate_language(language)
+    cleaned_language = _persisted_language(requested_language)
     cleaned = transcription.strip()
     if not cleaned:
         raise HTTPException(
@@ -444,11 +466,12 @@ async def create_voice_and_text_emergency(
 
     relative_path, original_name, content_type, size_bytes = await _save_audio_file(file)
     snapshot_data = await _save_map_snapshot(map_snapshot) if map_snapshot else None
-    meta = _parse_metadata(client_metadata)
+    meta = _parse_metadata(client_metadata) or {}
+    meta.setdefault("requested_language", requested_language)
 
     emergency = EmergencyCall(
         call_type="voice_text",
-        language=language.strip(),
+        language=cleaned_language,
         status="received",
         priority=(priority or "normal").strip() or "normal",
         audio_file_path=relative_path,

@@ -1,0 +1,8 @@
+# Local Sarvam credentials
+.env
+
+# Local recordings may contain sensitive emergency audio
+*.wav
+*.mp3
+*.m4a
+*.ogg

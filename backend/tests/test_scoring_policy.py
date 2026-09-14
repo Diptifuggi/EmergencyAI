@@ -48,9 +48,9 @@ def test_final_schema_rejects_out_of_range_scores(field: str, value: int) -> Non
 @pytest.mark.parametrize(
     ("transcript", "emergency_type", "minimum_level", "expected_help"),
     [
-        ("I had a small road accident. Nobody is injured and we need some assistance.", EmergencyType.ACCIDENT, "LOW", [HelpRequired.POLICE]),
-        ("Major accident near Vapi Main Highway. Several people are injured and need immediate medical help.", EmergencyType.ACCIDENT, "HIGH", [HelpRequired.AMBULANCE, HelpRequired.POLICE]),
-        ("Major accident near Vapi Main Highway. A vehicle is on fire and people are trapped.", EmergencyType.ACCIDENT, "CRITICAL", [HelpRequired.AMBULANCE, HelpRequired.POLICE, HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE]),
+        ("I had a small road accident. Nobody is injured and we need some assistance.", EmergencyType.ACCIDENT, "LOW", [HelpRequired.UNKNOWN]),
+        ("Major accident near Vapi Main Highway. Several people are injured and need immediate medical help.", EmergencyType.ACCIDENT, "HIGH", [HelpRequired.AMBULANCE]),
+        ("Major accident near Vapi Main Highway. A vehicle is on fire and people are trapped.", EmergencyType.ACCIDENT, "CRITICAL", [HelpRequired.AMBULANCE, HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE]),
         ("Someone is following me while I am walking alone. I am scared. Please send police.", EmergencyType.POLICE, "HIGH", [HelpRequired.POLICE]),
         ("My father has severe chest pain and needs an ambulance immediately.", EmergencyType.MEDICAL, "HIGH", [HelpRequired.AMBULANCE]),
         ("There is a fire in a building and people are trapped inside.", EmergencyType.FIRE, "HIGH", [HelpRequired.AMBULANCE, HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE]),

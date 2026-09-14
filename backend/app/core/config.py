@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     NOMINATIM_COUNTRY_CODE: str = 'in'
     MAP_TILE_URL: str = 'http://localhost:8081/tiles/{z}/{x}/{y}.png'
 
+    # Sarvam credentials stay on the backend; never expose this value to Flutter.
+    SARVAM_API_KEY: str = ''
+    SARVAM_API_URL: str = 'https://api.sarvam.ai/speech-to-text'
+    SARVAM_STT_MODEL: str = 'saaras:v4'
+    SARVAM_TIMEOUT_SECONDS: float = 60.0
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / '.env',
         env_file_encoding='utf-8',

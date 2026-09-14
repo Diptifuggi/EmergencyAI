@@ -28,7 +28,7 @@ async def analyze_without_ollama(text: str):
         (
             "There has been a major road accident near the railway station. Several people are injured and need medical help.",
             "accident",
-            {"ambulance", "medical_assistance", "police"},
+            {"ambulance", "medical_assistance"},
             {"fire_service", "rescue"},
         ),
         (
@@ -94,7 +94,4 @@ async def test_active_home_intrusion_has_unified_and_police_numbers() -> None:
     assert result.analysis.crime_in_progress is True
     assert result.analysis.home_intrusion is True
     assert result.analysis.burglary_in_progress is True
-    assert result.analysis.dispatch_recommendation.emergency_numbers == {
-        "112": "Integrated Emergency Response",
-        "100": "Police",
-    }
+    assert result.analysis.dispatch_recommendation.emergency_numbers == {"police": ["100"]}

@@ -66,7 +66,8 @@ async def test_create_text_emergency(async_client: AsyncClient) -> None:
     data = response.json()
     assert data["status"] == STATUS_ANALYZED
     assert data["text_content"] == payload["text"]
-    assert data["language"] == payload["language"]
+    assert data["language"] == "en-IN"
+    assert data["requested_language"] == "en-IN"
     assert data["call_type"] == "text"
     assert data["latitude"] == payload["latitude"]
     assert data["longitude"] == payload["longitude"]

@@ -9,7 +9,6 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 
 import '../core/language/emergency_language_option.dart';
 import '../core/language/language_mapper.dart';
@@ -34,18 +33,17 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   final _latitudeController = TextEditingController();
   final _longitudeController = TextEditingController();
   final _record = AudioRecorder();
-  final _speech = SpeechToText();
   final _locationService = LocationService();
 
   EmergencyLanguageOption _selectedLanguage = EmergencyLanguageOption.english;
-  List<LocaleName> _sttLocales = [];
-  LocaleName? _activeSttLocale;
 
   bool _isRecording = false;
-  bool _isListening = false;
+  bool _isSarvamRecording = false;
   bool _isSubmitting = false;
-  bool _speechAvailable = false;
+  bool _isTranscribing = false;
   String? _audioPath;
+  String? _transcriptionLanguage;
+  Map<String, dynamic>? _transcriptionMetadata;
   String? _statusMessage;
   String? _backendUrl;
   bool _isDiscoveringBackend = false;
@@ -59,7 +57,6 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   @override
   void initState() {
     super.initState();
-    _initSpeech();
     _initBackendConnection();
   }
 
@@ -71,37 +68,6 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     _latitudeController.dispose();
     _record.dispose();
     super.dispose();
-  }
-
-  Future<void> _initSpeech() async {
-    if (kIsWeb) return;
-
-    final available = await _speech.initialize(
-      onError: (error) => _showMessage('Speech error: ${error.errorMsg}'),
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          if (mounted) {
-            setState(() => _isListening = false);
-          }
-        }
-      },
-    );
-
-    if (!mounted) return;
-
-    final locales = await _speech.locales();
-    if (!mounted) return;
-
-    setState(() {
-      _speechAvailable = available;
-      _sttLocales = locales;
-      _activeSttLocale = LanguageMapper.pickSttLocale(
-        _sttLocales,
-        _selectedLanguage,
-      );
-    });
-
-    _logLanguageContext();
   }
 
   Future<void> _initBackendConnection() async {
@@ -172,7 +138,6 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     if (value == null) return;
     setState(() {
       _selectedLanguage = value;
-      _activeSttLocale = LanguageMapper.pickSttLocale(_sttLocales, value);
     });
     _logLanguageContext();
   }
@@ -181,68 +146,90 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     return LanguageMapper.resolveApiCode(selected: _selectedLanguage);
   }
 
-  void _logLanguageContext() {
-    final apiLanguage = _resolveApiLanguage();
-    debugPrint(
-        '[EmergencyIQ] Selected language: ${_selectedLanguage.displayName}');
-    debugPrint(
-      '[EmergencyIQ] STT locale: ${_activeSttLocale?.localeId ?? 'unavailable'}',
-    );
-    debugPrint('[EmergencyIQ] API language: ${apiLanguage ?? 'invalid'}');
+  String? _canonicalLanguage(String? value) {
+    return LanguageMapper.toApiCode(value);
   }
 
-  Future<void> _startListening() async {
+  void _logLanguageContext() {
+    final apiLanguage = _resolveApiLanguage();
+    debugPrint('[LANG] UI selection=${_selectedLanguage.displayName}');
+    debugPrint('[LANG] request language=${apiLanguage ?? 'invalid'}');
+  }
+
+  Future<void> _startSarvamRecording() async {
     if (kIsWeb) {
       _showMessage('Speech recognition is not supported on Web.');
       return;
     }
+    try {
+      setState(() => _isSarvamRecording = true);
+      await _startRecording();
+      if (mounted && !_isRecording) {
+        setState(() => _isSarvamRecording = false);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSarvamRecording = false);
+        _showMessage('Unable to start microphone recording. Please try again.');
+      }
+    }
+  }
 
-    if (!_speechAvailable) {
-      _showMessage('Speech recognition is not available on this device.');
+  Future<void> _stopSarvamRecording() async {
+    try {
+      await _stopRecording();
+      if (!mounted || _audioPath == null) return;
+      await _transcribeRecordedAudio();
+    } catch (_) {
+      if (mounted) {
+        _showMessage('Unable to record audio. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isSarvamRecording = false);
+    }
+  }
+
+  Future<void> _transcribeRecordedAudio() async {
+    final audioPath = _audioPath;
+    if (audioPath == null) return;
+    final file = File(audioPath);
+    if (!await file.exists() || await file.length() == 0) {
+      _showMessage('Audio recording is empty. Please try again.');
       return;
     }
 
-    final permission = await Permission.microphone.request();
-    if (!permission.isGranted) {
-      _showMessage('Microphone permission is required for speech recognition.');
-      return;
-    }
-
-    final locale = _activeSttLocale ??
-        LanguageMapper.pickSttLocale(_sttLocales, _selectedLanguage);
-    if (locale == null) {
-      _showMessage(
-        'No speech locale found for ${_selectedLanguage.displayName}.',
-      );
+    final language = _resolveApiLanguage();
+    if (!LanguageMapper.isValidApiCode(language)) {
+      _showMessage('Please select a supported transcription language.');
       return;
     }
 
     setState(() {
-      _activeSttLocale = locale;
-      _isListening = true;
-      _statusMessage = 'Listening in ${_selectedLanguage.displayName}...';
+      _isTranscribing = true;
+      _statusMessage = 'Uploading audio and transcribing…';
     });
-    _logLanguageContext();
-
-    await _speech.listen(
-      onResult: (result) {
-        setState(() {
-          _textController.text = result.recognizedWords;
-          _statusMessage = result.finalResult
-              ? 'Speech captured.'
-              : 'Listening: ${result.recognizedWords}';
-        });
-      },
-      listenOptions: SpeechListenOptions(
-        localeId: locale.localeId,
-        listenMode: ListenMode.confirmation,
-      ),
-    );
-  }
-
-  Future<void> _stopListening() async {
-    await _speech.stop();
-    setState(() => _isListening = false);
+    try {
+      final result = await EmergencyApiService().transcribeAudio(
+        audioFile: file,
+        language: language!,
+      );
+      _textController.text = result.transcript;
+      _transcriptionLanguage = _canonicalLanguage(result.language) ??
+          (language == 'auto' ? null : language);
+      _transcriptionMetadata = {
+        'stt_provider': result.provider,
+        'stt_model': result.model,
+        'stt_timestamp': result.timestamp,
+        'stt_language': result.language,
+        'stt_metadata': result.metadata,
+      };
+      debugPrint('[LANG] detected language=${result.language ?? 'unknown'}');
+      _showMessage('Speech converted successfully');
+    } catch (error) {
+      _showMessage(_friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _isTranscribing = false);
+    }
   }
 
   Future<void> _startRecording() async {
@@ -354,13 +341,13 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
           );
           _mapSnapshotStatus = 'Map snapshot stored with incident';
         } catch (error) {
-          _mapSnapshotStatus = 'Map snapshot unavailable: $error';
+          _mapSnapshotStatus = 'Map snapshot unavailable: ${_friendlyError(error)}';
         }
       }
       _showMessage(_formatSavedCall(call));
       _textController.clear();
     } catch (error) {
-      _showMessage('Failed to send emergency: $error');
+      _showMessage(_friendlyError(error));
     } finally {
       setState(() => _isSubmitting = false);
     }
@@ -391,7 +378,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       'filename=${path.basename(file.path)}',
     );
 
-    final transcription = _textController.text.trim();
+    var transcription = _textController.text.trim();
     final language = _resolveApiLanguage();
 
     if (!LanguageMapper.isValidApiCode(language)) {
@@ -403,6 +390,50 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
 
     _logLanguageContext();
 
+    // A blank review field means the user has not yet received a Sarvam transcript.
+    // Transcribe first and stop here so the user can review/edit before submission.
+    if (transcription.isEmpty) {
+      try {
+        setState(() {
+          _isTranscribing = true;
+          _statusMessage = 'Uploading audio and transcribing…';
+        });
+        final transcriptionResult = await EmergencyApiService().transcribeAudio(
+          audioFile: file,
+          language: language!,
+          audioBytes: audioBytes,
+        );
+        transcription = transcriptionResult.transcript;
+        _textController.text = transcription;
+        final detectedLanguage = _canonicalLanguage(transcriptionResult.language);
+        _transcriptionLanguage = detectedLanguage;
+        _transcriptionMetadata = {
+          'stt_provider': transcriptionResult.provider,
+          'stt_model': transcriptionResult.model,
+          'stt_timestamp': transcriptionResult.timestamp,
+          'stt_language': transcriptionResult.language,
+          'stt_metadata': transcriptionResult.metadata,
+        };
+        if (_selectedLanguage == EmergencyLanguageOption.auto && detectedLanguage != null) {
+          _statusMessage = 'Transcript ready (${transcriptionResult.language}). Review it, then submit again.';
+        } else {
+          _statusMessage = 'Transcript ready. Review it, then submit again.';
+        }
+        return;
+      } catch (error) {
+        _showMessage(_friendlyError(error));
+        return;
+      } finally {
+        if (mounted) setState(() => _isTranscribing = false);
+      }
+    }
+
+    final submissionLanguage = language == 'auto' ? _transcriptionLanguage : language;
+    if (!LanguageMapper.isValidApiCode(submissionLanguage) || submissionLanguage == 'auto') {
+      _showMessage('Please transcribe the recording with Sarvam before submitting.');
+      return;
+    }
+
     setState(() => _isSubmitting = true);
     try {
       final location = await _locationForSubmission();
@@ -411,7 +442,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         final call = await service.submitVoiceAndText(
           audioFile: file,
           transcription: transcription,
-          language: language!,
+          language: submissionLanguage!,
           latitude:
               location?.latitude ?? _parseCoordinate(_latitudeController.text),
           longitude: location?.longitude ??
@@ -423,7 +454,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
             'map_snapshot_status': _mapSnapshotStatus,
             'recorded_at': DateTime.now().toIso8601String(),
             'selected_language': _selectedLanguage.displayName,
-            'stt_locale': _activeSttLocale?.localeId,
+            if (_transcriptionMetadata != null) ..._transcriptionMetadata!,
             if (_locationError != null) 'location_error': _locationError,
           },
           mapSnapshot: _mapSnapshot,
@@ -435,7 +466,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       } else {
         final call = await service.submitAudioEmergency(
           audioFile: file,
-          language: language!,
+          language: submissionLanguage!,
           latitude:
               location?.latitude ?? _parseCoordinate(_latitudeController.text),
           longitude: location?.longitude ??
@@ -459,9 +490,11 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       }
       setState(() {
         _audioPath = null;
+        _transcriptionLanguage = null;
+        _transcriptionMetadata = null;
       });
     } catch (error) {
-      _showMessage('Failed to send voice emergency: $error');
+      _showMessage('Unable to submit emergency. Please try again or enter the message manually.');
     } finally {
       setState(() => _isSubmitting = false);
     }
@@ -477,6 +510,16 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
+  }
+
+  String _friendlyError(Object error) {
+    if (error is SocketException || error is TimeoutException) {
+      return 'Unable to connect to the EmergencyIQ server.';
+    }
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty
+        ? 'The request failed. Please try again.'
+        : message;
   }
 
   Future<void> _openCallerLocation() async {
@@ -596,14 +639,6 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
               .toList(),
           onChanged: _isSubmitting ? null : _onLanguageChanged,
         ),
-        if (_activeSttLocale != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              'STT locale: ${_activeSttLocale!.name}',
-              style: TextStyle(fontSize: 12, color: AppColors.secondaryText),
-            ),
-          ),
       ],
     );
   }
@@ -655,20 +690,20 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
               if (!kIsWeb) ...[
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
-                  icon: Icon(_isListening
+                    icon: Icon(_isSarvamRecording
                       ? Icons.stop_circle_outlined
                       : Icons.mic_none),
-                  label: Text(_isListening
+                    label: Text(_isSarvamRecording
                       ? 'Stop Listening'
                       : 'Speak Emergency (STT)'),
-                  onPressed: _isSubmitting
+                    onPressed: _isSubmitting || _isTranscribing
                       ? null
-                      : _isListening
-                          ? _stopListening
-                          : _startListening,
+                      : _isSarvamRecording
+                        ? _stopSarvamRecording
+                        : _startSarvamRecording,
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
-                        _isListening ? AppColors.dangerRed : AppColors.primary,
+                      _isSarvamRecording ? AppColors.dangerRed : AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -756,7 +791,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                         label: Text(_isRecording
                             ? 'Stop Recording'
                             : 'Start Recording'),
-                        onPressed: _isSubmitting
+                        onPressed: _isSubmitting || _isSarvamRecording || _isTranscribing
                             ? null
                             : _isRecording
                                 ? _stopRecording
@@ -781,7 +816,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                 ElevatedButton.icon(
                   icon: const Icon(Icons.upload_file_rounded),
                   label: const Text('Submit Voice + Text'),
-                  onPressed: _isSubmitting ? null : _submitAudioEmergency,
+                  onPressed: _isSubmitting || _isTranscribing ? null : _submitAudioEmergency,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.secondaryText,
                     foregroundColor: AppColors.primaryText,
@@ -790,7 +825,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Tip: speak or type the emergency text above, then submit so voice and text are stored together.',
+                  'Record audio, submit once to transcribe with Sarvam, review the transcript, then submit again.',
                   style: TextStyle(fontSize: 12),
                 ),
               ],

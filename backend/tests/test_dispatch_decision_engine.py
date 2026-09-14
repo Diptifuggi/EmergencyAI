@@ -9,21 +9,21 @@ def services(text: str, kind: EmergencyType, language: str = "en") -> list[str]:
     )]
 
 
-def test_major_railway_accident_has_ambulance_and_police() -> None:
+def test_major_railway_accident_without_injury_has_no_dispatch_unit() -> None:
     assert services("major accident at railway station", EmergencyType.ACCIDENT) == [
-        "ambulance", "police"
+        "unknown"
     ]
 
 
-def test_major_accident_with_injuries_has_ambulance_and_police() -> None:
+def test_major_accident_with_injuries_has_ambulance_only() -> None:
     assert services("major accident three people injured", EmergencyType.ACCIDENT) == [
-        "ambulance", "police"
+        "ambulance"
     ]
 
 
 def test_trapped_train_accident_adds_fire_and_rescue() -> None:
     assert services("train accident people trapped", EmergencyType.ACCIDENT) == [
-        "ambulance", "police", "fire_service", "rescue"
+        "ambulance", "fire_service", "rescue"
     ]
 
 

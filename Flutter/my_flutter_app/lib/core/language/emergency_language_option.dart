@@ -14,29 +14,36 @@ class EmergencyLanguageOption {
 
   static const english = EmergencyLanguageOption(
     displayName: 'English',
-    apiCode: 'en',
+    apiCode: 'en-IN',
     sttLocalePrefixes: ['en'],
+  );
+
+  static const auto = EmergencyLanguageOption(
+    displayName: 'Auto Detect',
+    apiCode: 'auto',
+    sttLocalePrefixes: [],
   );
 
   static const hindi = EmergencyLanguageOption(
     displayName: 'Hindi',
-    apiCode: 'hi',
+    apiCode: 'hi-IN',
     sttLocalePrefixes: ['hi'],
   );
 
   static const gujarati = EmergencyLanguageOption(
     displayName: 'Gujarati',
-    apiCode: 'gu',
+    apiCode: 'gu-IN',
     sttLocalePrefixes: ['gu'],
   );
 
   static const marathi = EmergencyLanguageOption(
     displayName: 'Marathi',
-    apiCode: 'mr',
+    apiCode: 'mr-IN',
     sttLocalePrefixes: ['mr'],
   );
 
   static const List<EmergencyLanguageOption> all = [
+    auto,
     english,
     hindi,
     gujarati,

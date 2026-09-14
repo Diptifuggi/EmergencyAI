@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..core.language import primary_language
+
 
 class EmergencyType(str, Enum):
     CRIME_POLICE = "crime_police"
@@ -74,7 +76,7 @@ class EmergencyAnalysisInput(BaseModel):
 
     def resolved_language(self) -> str:
         value = (self.language or "en").strip().lower() or "en"
-        return value.replace("_", "-").split("-", 1)[0]
+        return primary_language(value) or "en"
 
 
 class DispatchRecommendation(BaseModel):
@@ -110,7 +112,15 @@ class EmergencyAnalysis(BaseModel):
     stress_level: AnalysisLevel
     dispatch_recommendation: DispatchRecommendation
     confidence: float = Field(ge=0.0, le=1.0)
+    context_state: str = "current"
+    current_emergency: bool = True
+    hypothetical: bool = False
+    historical: bool = False
+    resolved: bool = False
+    uncertain: bool = False
+    negated: bool = False
     victim_count: int | None = Field(default=None, ge=0)
+    victim_count_approximate: bool = False
     injuries_present: bool = False
     unconscious_person: bool = False
     severe_bleeding: bool = False

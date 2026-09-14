@@ -14,6 +14,41 @@ void main() {
       );
     });
 
+    test('candidateBackends prefers adb reverse, then emulator, then physical LAN fallback', () {
+      final candidates = BackendDiscovery.candidateBackends();
+      expect(candidates, [
+        'http://127.0.0.1:8000',
+        'http://10.0.2.2:8000',
+        'http://192.168.2.200:8000',
+      ]);
+    });
+
+    test('selectHealthyBackend picks the first healthy candidate', () async {
+      final selected = await BackendDiscovery.selectHealthyBackend(
+        candidates: [
+          'http://127.0.0.1:8000',
+          'http://10.0.2.2:8000',
+          'http://192.168.2.200:8000',
+        ],
+        probe: (candidate) async => candidate == 'http://10.0.2.2:8000',
+      );
+
+      expect(selected, 'http://10.0.2.2:8000');
+    });
+
+    test('selectHealthyBackend returns null when every candidate fails', () async {
+      final selected = await BackendDiscovery.selectHealthyBackend(
+        candidates: [
+          'http://127.0.0.1:8000',
+          'http://10.0.2.2:8000',
+          'http://192.168.2.200:8000',
+        ],
+        probe: (_) async => false,
+      );
+
+      expect(selected, isNull);
+    });
+
     test('prioritizedHosts scans gateway and common dev IPs first', () {
       final hosts = BackendDiscovery.prioritizedHosts();
       expect(hosts.first, 1);

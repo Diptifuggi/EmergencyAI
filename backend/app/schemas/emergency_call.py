@@ -6,6 +6,8 @@ from uuid import UUID
             # Fall back to coordinates for records created before this migration.
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ..core.language import bcp47_language
+
 
 class EmergencyCallTextCreate(BaseModel):
     """Create a text-only emergency report. Extra fields are ignored for forward compatibility."""
@@ -17,7 +19,7 @@ class EmergencyCallTextCreate(BaseModel):
         ...,
         min_length=2,
         max_length=35,
-        pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*$",
+        pattern=r"^(?:auto|[A-Za-z]{2,3}(?:-[A-Za-z0-9]+)*)$",
     )
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
@@ -80,6 +82,7 @@ class EmergencyCallOut(BaseModel):
     user_id: UUID | None = None
     call_type: str
     text_content: str | None = None
+    requested_language: str | None = None
     language: str | None = None
     status: str
     priority: str
@@ -105,6 +108,20 @@ class EmergencyCallOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     location: LocationResponse | None = None
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def normalize_language(cls, value: Any) -> Any:
+        if value is None or str(value).strip().lower() == "auto":
+            return value
+        return bcp47_language(str(value)) or value
+
+    @field_validator("requested_language", mode="before")
+    @classmethod
+    def normalize_requested_language(cls, value: Any) -> Any:
+        if value is None or str(value).strip().lower() == "auto":
+            return value
+        return bcp47_language(str(value)) or value
 
     @model_validator(mode="before")
     @classmethod

@@ -15,6 +15,9 @@ class BackendDiscovery {
 
   static const cacheKey = 'emergencyiq_api_base_url';
   static const port = 8000;
+  static const configuredBackend = 'http://192.168.2.200:8000';
+  static const emulatorBackend = 'http://10.0.2.2:8000';
+  static const adbReverseBackend = 'http://127.0.0.1:8000';
   static const healthPath = '/api/v1/health';
   static const connectTimeout = Duration(milliseconds: 900);
   static const scanBatchSize = 24;
@@ -25,6 +28,28 @@ class BackendDiscovery {
 
   static Future<String> resolveBaseUrl({http.Client? client}) {
     return BackendDiscovery(client: client).ensureResolved();
+  }
+
+  static List<String> candidateBackends() {
+    return [
+      adbReverseBackend,
+      emulatorBackend,
+      configuredBackend,
+    ];
+  }
+
+  static Future<String?> selectHealthyBackend({
+    required List<String> candidates,
+    required Future<bool> Function(String candidate) probe,
+  }) async {
+    for (final candidate in candidates) {
+      final normalized = normalizeBaseUrl(candidate);
+      final healthy = await probe(normalized);
+      if (healthy) {
+        return normalized;
+      }
+    }
+    return null;
   }
 
   Future<String> ensureResolved() {
@@ -40,48 +65,55 @@ class BackendDiscovery {
 
   Future<String> _resolve() async {
     if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
-      resolved = 'http://127.0.0.1:$port';
+      resolved = adbReverseBackend;
+      debugPrint('[Backend] FLUTTER_TEST resolved to $resolved');
       return resolved!;
     }
 
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) {
       resolved = normalizeBaseUrl(fromEnv);
-      debugPrint('[EmergencyIQ] Backend from API_BASE_URL: $resolved');
+      debugPrint('[Backend] API_BASE_URL override: $resolved');
       return resolved!;
     }
 
     final prefs = await SharedPreferences.getInstance();
     final cached = prefs.getString(cacheKey);
-    if (cached != null && await _isHealthy(cached)) {
-      resolved = normalizeBaseUrl(cached);
-      debugPrint('[EmergencyIQ] Backend from cache: $resolved');
-      return resolved!;
-    }
-
-    final quickCandidates = <String>[
-      'http://127.0.0.1:$port',
-      'http://10.0.2.2:$port',
-    ];
-
-    for (final candidate in quickCandidates) {
-      if (await _isHealthy(candidate)) {
-        await _remember(prefs, candidate);
+    if (cached != null) {
+      final normalized = normalizeBaseUrl(cached);
+      if (await _isHealthy(normalized)) {
+        resolved = normalized;
+        debugPrint('[Backend] Cache hit: $resolved');
         return resolved!;
       }
+    }
+
+    final candidates = candidateBackends();
+    final selected = await selectHealthyBackend(
+      candidates: candidates,
+      probe: (candidate) => _isHealthy(candidate),
+    );
+
+    if (selected != null) {
+      await _remember(prefs, selected);
+      resolved = selected;
+      debugPrint('[Backend] Selected backend URL: $resolved');
+      return resolved!;
     }
 
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       final subnetHit = await _discoverOnWifiSubnet(prefs);
       if (subnetHit != null) {
-        return subnetHit;
+        resolved = subnetHit;
+        debugPrint('[Backend] Selected backend from Wi-Fi scan: $resolved');
+        return resolved!;
       }
     }
 
-    resolved = 'http://127.0.0.1:$port';
+    resolved = configuredBackend;
     debugPrint(
-      '[EmergencyIQ] Backend discovery failed; fallback $resolved '
-      '(use USB + adb reverse or same Wi-Fi as PC)',
+      '[Backend] No healthy backend found; fallback to $resolved '
+      '(physical Android should use the LAN PC IP, unless ADB reverse is configured)',
     );
     return resolved!;
   }
@@ -129,15 +161,23 @@ class BackendDiscovery {
   }
 
   Future<bool> _isHealthy(String baseUrl) async {
+    final normalized = normalizeBaseUrl(baseUrl);
+    final uri = Uri.parse('$normalized$healthPath');
+    debugPrint('[Health] Probing URL: $uri');
+
     try {
-      final uri = Uri.parse('${normalizeBaseUrl(baseUrl)}$healthPath');
       final response = await _client
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(connectTimeout);
-      if (response.statusCode != 200) return false;
-      final body = response.body;
-      return body.contains('"status"') && body.contains('ok');
-    } catch (_) {
+      final isOk = response.statusCode == 200 &&
+          response.body.contains('"status"') &&
+          response.body.contains('ok');
+      debugPrint(
+        '[Health] ${isOk ? 'PASS' : 'FAIL'} ${uri.toString()} status=${response.statusCode}',
+      );
+      return isOk;
+    } catch (error) {
+      debugPrint('[Health] FAIL $uri error=${error.runtimeType}: $error');
       return false;
     }
   }
@@ -161,5 +201,5 @@ class BackendDiscovery {
     return hosts.toList();
   }
 
-  static String get baseUrl => resolved ?? 'http://127.0.0.1:$port';
+  static String get baseUrl => resolved ?? configuredBackend;
 }
