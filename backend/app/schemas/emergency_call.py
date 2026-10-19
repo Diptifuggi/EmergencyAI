@@ -38,6 +38,27 @@ class EmergencyCallTextCreate(BaseModel):
         return value
 
 
+class EmergencyCallManualCreate(BaseModel):
+    """Persist an operator-entered call shell without inventing a transcript."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    caller_name: str = Field(..., min_length=1, max_length=200)
+    caller_phone: str = Field(..., min_length=1, max_length=50)
+    started_at: datetime | None = None
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    source: str = Field(default="react_operator", min_length=1, max_length=50)
+
+    @field_validator("caller_name", "caller_phone", "source")
+    @classmethod
+    def strip_manual_values(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("must not be empty")
+        return cleaned
+
+
 class EmergencyCallUpdate(BaseModel):
     """Partial update — only provided fields are changed. Safe for future clients."""
 

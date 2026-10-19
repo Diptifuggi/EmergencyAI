@@ -1,16 +1,22 @@
 // @ts-nocheck
 import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { getEmergencies } from '@/api/emergencyApi'
-import { createDispatch } from '@/api/dispatchApi'
+import { categoryForCall, locationForCall } from '@/types/emergency'
 import Loading from '@/components/common/Loading'
 import ErrorMessage from '@/components/common/ErrorMessage'
 import Card from '@/components/common/Card'
+import { toast } from 'react-hot-toast'
 
 export default function DispatchCenter() {
-  const qc = useQueryClient()
-  const { data, isLoading, error } = useQuery({ queryKey: ['emergencies'], queryFn: () => getEmergencies({ status: 'Processing' }) })
-  const mutation = useMutation({ mutationFn: createDispatch, onSuccess: () => qc.invalidateQueries({ queryKey: ['emergencies'] }) })
+  const { data: calls = [], isLoading, error } = useQuery({
+    queryKey: ['emergency-calls'],
+    queryFn: () => getEmergencies({ limit: 200, offset: 0 }),
+    refetchInterval: 10000,
+  })
+  const data = calls
+    .filter((call) => ['received', 'pending_transcription', 'analyzing'].includes(call.status))
+    .map((call) => ({ ...call, category: categoryForCall(call), location: locationForCall(call) }))
   const [selected, setSelected] = useState(null)
 
   if (isLoading) return <Loading />
@@ -35,7 +41,7 @@ export default function DispatchCenter() {
                   <option>Women Team</option>
                   <option>Child Protection Team</option>
                 </select>
-                <button className="px-3 py-1 bg-black text-white rounded" onClick={()=>mutation.mutate({ call_id: call.id, department: selected })}>Dispatch</button>
+                <button className="px-3 py-1 bg-black text-white rounded" onClick={()=>toast.error('Dispatch assignment is not available from the current backend.')}>Dispatch</button>
               </div>
             </div>
           ))}

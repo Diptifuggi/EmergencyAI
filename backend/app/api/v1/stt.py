@@ -34,8 +34,7 @@ async def transcribe(
     language: str | None = Form(None),
 ) -> dict:
     logger.info(
-        "[STT] Request received filename=%s content_type=%s language_code=%s",
-        file.filename or "(missing)",
+        "[STT] Request received content_type=%s language_code=%s",
         file.content_type or "(missing)",
         language_code or language or "auto",
     )
@@ -48,8 +47,7 @@ async def transcribe(
         raise HTTPException(status_code=422, detail="Unsupported audio format")
     audio = await file.read()
     logger.info(
-        "[STT] Upload received filename=%s content_type=%s file_size=%d language_code=%s",
-        file.filename or "(missing)",
+        "[STT] Upload received content_type=%s file_size=%d language_code=%s",
         file.content_type or "(missing)",
         len(audio),
         language_code or language or "auto",

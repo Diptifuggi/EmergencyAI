@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
@@ -21,60 +22,10 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui'
-
-// TODO Replace with FastAPI endpoint
-const MOCK_CALL_DETAILS = {
-  id: 'CALL-001',
-  caller_name: 'Ramesh Patel',
-  caller_phone: '+91 9876543210',
-  caller_email: 'ramesh@gmail.com',
-  age: 38,
-  gender: 'Male',
-  language: 'Gujarati',
-  address: 'Silvassa Main Road',
-  city: 'Silvassa',
-  state: 'Dadra and Nagar Haveli',
-  latitude: 20.2735,
-  longitude: 73.0082,
-  call_time: '26 Jun 2026 09:18',
-  duration: '03:12',
-  category: 'Road Accident',
-  priority: 'Critical',
-  severity_score: 92,
-  status: 'Processing',
-  emotion: 'Panic',
-  emotion_score: 0.91,
-  background_noise: 'Traffic',
-  noise_level: 'Medium',
-  vehicle_count: 3,
-  injured_people: 4,
-  fatalities: 0,
-  ambulance_required: true,
-  police_required: true,
-  fire_required: false,
-  incident_id: 'INC-001',
-  transcript_raw:
-    'Major accident on Silvassa Main Road near bus stand...',
-  transcript_clean:
-    'There has been a collision involving three vehicles. Four people are injured and require immediate medical assistance.',
-  keywords: ['accident', 'injured', 'ambulance', 'traffic', 'bus stand'],
-  audio_events: [
-    { event: 'Car Crash', confidence: 98 },
-    { event: 'People Screaming', confidence: 91 },
-    { event: 'Vehicle Horn', confidence: 74 },
-  ],
-  score_breakdown: {
-    category: 90,
-    keywords: 100,
-    emotion: 84,
-    audio: 95,
-    location: 90,
-  },
-  dispatches: [
-    { department: 'Police', officer: 'Rajesh Kumar', status: 'Dispatched' },
-    { department: 'Ambulance', officer: 'Unit 108-B', status: 'On Route' },
-  ],
-}
+import { getEmergency } from '@/api/emergencyApi'
+import { analysisForCall, categoryForCall, transcriptForCall } from '@/types/emergency'
+import Loading from '@/components/common/Loading'
+import ErrorMessage from '@/components/common/ErrorMessage'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -83,18 +34,109 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 })
 
-const scoreRows = [
-  { label: 'Category', value: MOCK_CALL_DETAILS.score_breakdown.category },
-  { label: 'Keywords', value: MOCK_CALL_DETAILS.score_breakdown.keywords },
-  { label: 'Emotion', value: MOCK_CALL_DETAILS.score_breakdown.emotion },
-  { label: 'Audio', value: MOCK_CALL_DETAILS.score_breakdown.audio },
-  { label: 'Location', value: MOCK_CALL_DETAILS.score_breakdown.location },
-]
-
 export default function CallViewerPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const call = { ...MOCK_CALL_DETAILS, id: id || MOCK_CALL_DETAILS.id }
+  const { data: emergency, isLoading, error } = useQuery({
+    queryKey: ['emergency-call', id],
+    queryFn: () => getEmergency(id as string),
+    enabled: Boolean(id),
+    refetchInterval: 15000,
+  })
+
+  if (isLoading) return <Loading />
+  if (error || !emergency) return <ErrorMessage error={error || new Error('Emergency call not found.')} />
+
+  const analysis = analysisForCall(emergency)
+  const metadata = emergency.client_metadata || {}
+  const helpRequired = Array.isArray(analysis.help_required) ? analysis.help_required : []
+  const recommendation = analysis.dispatch_recommendation || {}
+  const recommendedUnits = Array.isArray(recommendation.recommended_units) ? recommendation.recommended_units : []
+  const emergencyNumbers = recommendation.emergency_numbers && typeof recommendation.emergency_numbers === 'object'
+    ? recommendation.emergency_numbers
+    : {}
+  const transcript = transcriptForCall(emergency)
+  const rawTranscript = emergency.text_content && emergency.text_content.trim() ? emergency.text_content : (transcript || 'Not available')
+  const latitude = emergency.latitude ?? emergency.location?.latitude ?? null
+  const longitude = emergency.longitude ?? emergency.location?.longitude ?? null
+  const timestamp = emergency.created_at ? new Date(emergency.created_at) : null
+  const updatedAt = emergency.updated_at ? new Date(emergency.updated_at) : null
+  const callDate = timestamp && !Number.isNaN(timestamp.getTime())
+    ? timestamp.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replaceAll(',', '')
+    : 'Not available'
+  const callClock = timestamp && !Number.isNaN(timestamp.getTime())
+    ? timestamp.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : 'Not available'
+  const city = typeof metadata.city === 'string' && metadata.city.trim() ? metadata.city : 'Not available'
+  const state = typeof metadata.state === 'string' && metadata.state.trim() ? metadata.state : 'Not available'
+  const keywords = Array.isArray(analysis.emergency_keywords) ? analysis.emergency_keywords : []
+  const audioEvents = Array.isArray((emergency as any)?.audio_events) ? (emergency as any).audio_events : []
+  const dispatches = recommendedUnits.length > 0
+    ? recommendedUnits.map((unit: string) => ({
+        department: unit,
+        officer: 'Recommendation only',
+        status: recommendation.reason || 'Recommendation only',
+      }))
+    : []
+  const locationDisplay = [emergency.location_address || metadata.location_address, city, state].filter((value) => typeof value === 'string' && value.trim()).join(', ')
+  const call = {
+    id: emergency.id,
+    caller_name: typeof metadata.caller_name === 'string' && metadata.caller_name.trim() ? metadata.caller_name : 'Not available',
+    caller_phone: typeof metadata.caller_phone === 'string' && metadata.caller_phone.trim() ? metadata.caller_phone : 'Not available',
+    caller_email: typeof metadata.caller_email === 'string' && metadata.caller_email.trim() ? metadata.caller_email : 'Not available',
+    age: metadata.age ?? 'Not available',
+    gender: typeof metadata.gender === 'string' && metadata.gender.trim() ? metadata.gender : 'Not available',
+    language: emergency.language || emergency.requested_language || 'Not available',
+    source: emergency.source || 'Not available',
+    call_type: emergency.call_type || 'Not available',
+    status: emergency.status || 'Not available',
+    priority: (analysis.priority_level || emergency.priority || 'Not available').toString(),
+    category: categoryForCall(emergency),
+    address: emergency.location_address || locationDisplay || 'Not available',
+    city,
+    state,
+    latitude,
+    longitude,
+    call_date: callDate,
+    call_clock: callClock,
+    updated_at: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt.toLocaleString('en-GB') : 'Not available',
+    duration: 'Not available',
+    severity_score: typeof analysis.priority_score === 'number' ? analysis.priority_score : null,
+    emotion: analysis.panic_level ? `Panic (${analysis.panic_level})` : 'Not available',
+    emotion_score: typeof analysis.panic_score === 'number' ? analysis.panic_score / 100 : null,
+    background_noise: 'Not available',
+    noise_level: 'Not available',
+    vehicle_count: analysis.road_accident ? 'Road accident' : 'Not available',
+    injured_people: typeof analysis.victim_count === 'number' ? String(analysis.victim_count) : 'Not available',
+    fatalities: 'Not available',
+    ambulance_required: helpRequired.length > 0 ? helpRequired.some((item) => String(item).toLowerCase().includes('ambulance') || String(item).toLowerCase().includes('medical')) : null,
+    police_required: typeof analysis.police_required === 'boolean' ? analysis.police_required : helpRequired.some((item) => String(item).toLowerCase().includes('police')),
+    fire_required: helpRequired.some((item) => String(item).toLowerCase().includes('fire')),
+    incident_id: null,
+    transcript_raw: rawTranscript,
+    transcript_clean: transcript || 'Not available',
+    keywords,
+    audio_events: audioEvents,
+    audio_url: emergency.audio_url || null,
+    map_snapshot_url: emergency.map_snapshot_url || null,
+    score_breakdown: {
+      category: analysis.emergency_type || 'Not available',
+      keywords: keywords.length ? keywords.join(', ') : 'Not available',
+      emotion: typeof analysis.panic_score === 'number' ? analysis.panic_score : 'Not available',
+      audio: emergency.audio_file_size ? `${emergency.audio_file_size} bytes` : 'Not available',
+      location: latitude != null && longitude != null ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` : 'Not available',
+    },
+    dispatches,
+    emergency_numbers: emergencyNumbers,
+  }
+  const scoreRows = [
+    { label: 'Category', value: call.score_breakdown.category ?? 'Not available' },
+    { label: 'Keywords', value: call.score_breakdown.keywords ?? 'Not available' },
+    { label: 'Emotion', value: call.score_breakdown.emotion ?? 'Not available' },
+    { label: 'Audio', value: call.score_breakdown.audio ?? 'Not available' },
+    { label: 'Location', value: call.score_breakdown.location ?? 'Not available' },
+  ]
+  const hasLocation = latitude != null && longitude != null
 
   const handleDownloadReport = () => {
     const content = `Emergency Call Report\n\nCall ID: ${call.id}\nCaller: ${call.caller_name}\nPhone: ${call.caller_phone}\nEmail: ${call.caller_email}\nStatus: ${call.status}\nPriority: ${call.priority}\nCategory: ${call.category}\n\nTranscript:\n${call.transcript_clean}\n`
@@ -157,16 +199,16 @@ export default function CallViewerPage() {
               <div className="space-y-3 text-sm">
                 <div>
                   <div className="text-zinc-500">Address</div>
-                  <div className="font-medium">{call.address}, {call.city}, {call.state}</div>
+                  <div className="font-medium">{[call.address, call.city, call.state].filter((part) => typeof part === 'string' && part && part !== 'Not available').join(', ') || 'Not available'}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-zinc-500">Date</div>
-                    <div className="font-medium">{call.call_time.split(' ')[0]} {call.call_time.split(' ')[1]} {call.call_time.split(' ')[2]}</div>
+                    <div className="font-medium">{call.call_date}</div>
                   </div>
                   <div>
                     <div className="text-zinc-500">Time</div>
-                    <div className="font-medium">{call.call_time.split(' ')[3]}</div>
+                    <div className="font-medium">{call.call_clock}</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -176,7 +218,7 @@ export default function CallViewerPage() {
                   </div>
                   <div>
                     <div className="text-zinc-500">Incident</div>
-                    <button onClick={() => navigate(`/incidents/${call.incident_id}`)} className="text-sm text-blue-600 hover:underline">{call.incident_id}</button>
+                    {call.incident_id ? <button onClick={() => navigate(`/incidents/${call.incident_id}`)} className="text-sm text-blue-600 hover:underline">{call.incident_id}</button> : <div className="font-medium">Not available</div>}
                   </div>
                 </div>
               </div>
@@ -197,9 +239,9 @@ export default function CallViewerPage() {
               <div><strong>Vehicles involved:</strong> {call.vehicle_count}</div>
               <div><strong>Injured people:</strong> {call.injured_people}</div>
               <div><strong>Fatalities:</strong> {call.fatalities}</div>
-              <div><strong>Ambulance required:</strong> {call.ambulance_required ? 'Yes' : 'No'}</div>
-              <div><strong>Police required:</strong> {call.police_required ? 'Yes' : 'No'}</div>
-              <div><strong>Fire required:</strong> {call.fire_required ? 'Yes' : 'No'}</div>
+              <div><strong>Ambulance required:</strong> {call.ambulance_required == null ? 'Not available' : call.ambulance_required ? 'Yes' : 'No'}</div>
+              <div><strong>Police required:</strong> {call.police_required == null ? 'Not available' : call.police_required ? 'Yes' : 'No'}</div>
+              <div><strong>Fire required:</strong> {call.fire_required == null ? 'Not available' : call.fire_required ? 'Yes' : 'No'}</div>
               <div><strong>Noise level:</strong> {call.noise_level}</div>
             </CardContent>
           </Card>
@@ -222,9 +264,9 @@ export default function CallViewerPage() {
               <div>
                 <div className="text-sm text-zinc-500">Detected Keywords</div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {call.keywords.map((keyword) => (
+                  {Array.isArray(call.keywords) && call.keywords.length > 0 ? call.keywords.map((keyword) => (
                     <Badge key={keyword} className="bg-zinc-900 text-white">{keyword}</Badge>
-                  ))}
+                  )) : <span className="text-sm text-zinc-500">Not available</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -234,7 +276,7 @@ export default function CallViewerPage() {
                 </div>
                 <div>
                   <div className="text-zinc-500">Emotion Score</div>
-                  <div className="font-medium">{(call.emotion_score * 100).toFixed(0)}%</div>
+                  <div className="font-medium">{call.emotion_score == null ? 'Not available' : `${(call.emotion_score * 100).toFixed(0)}%`}</div>
                 </div>
                 <div>
                   <div className="text-zinc-500">Background Noise</div>
@@ -255,12 +297,12 @@ export default function CallViewerPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {call.audio_events.map((event) => (
+                    {Array.isArray(call.audio_events) && call.audio_events.length > 0 ? call.audio_events.map((event) => (
                       <TableRow key={event.event}>
                         <TableCell>{event.event}</TableCell>
                         <TableCell>{event.confidence}%</TableCell>
                       </TableRow>
-                    ))}
+                    )) : <TableRow><TableCell>Not available</TableCell><TableCell>Not available</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </div>
@@ -275,7 +317,7 @@ export default function CallViewerPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
-                <div className="text-5xl font-extrabold text-zinc-900">{call.severity_score}</div>
+                <div className="text-5xl font-extrabold text-zinc-900">{call.severity_score ?? 'Not available'}</div>
                 <div className="text-sm text-zinc-500">/ 100</div>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
@@ -301,13 +343,13 @@ export default function CallViewerPage() {
               <CardTitle>Dispatch Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-zinc-600">
-              {call.dispatches.map((dispatch) => (
+              {Array.isArray(call.dispatches) && call.dispatches.length > 0 ? call.dispatches.map((dispatch) => (
                 <div key={dispatch.department} className="rounded-lg border border-zinc-200 p-3">
                   <div className="font-medium">{dispatch.department}</div>
                   <div>{dispatch.officer}</div>
                   <div className="mt-1"><Badge className="bg-slate-800 text-white">{dispatch.status}</Badge></div>
                 </div>
-              ))}
+              )) : <div className="text-sm text-zinc-500">No dispatch data returned by the backend.</div>}
             </CardContent>
           </Card>
         </aside>
@@ -319,17 +361,15 @@ export default function CallViewerPage() {
             <CardTitle>Caller Location</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-72 rounded-xl overflow-hidden border border-zinc-200">
+            {hasLocation ? <div className="h-72 rounded-xl overflow-hidden border border-zinc-200">
               <MapContainer center={[call.latitude, call.longitude]} zoom={14} style={{ height: '100%', width: '100%' }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <Marker position={[call.latitude, call.longitude]}>
-                  <Popup>
-                    Caller Location<br />{call.address}
-                  </Popup>
+                  <Popup>Caller Location<br />{call.address}</Popup>
                 </Marker>
               </MapContainer>
-            </div>
-            <div className="mt-3 text-sm text-zinc-500">Caller Location • {call.address}, {call.city}</div>
+            </div> : <div className="h-72 rounded-xl overflow-hidden border border-zinc-200 flex items-center justify-center text-sm text-zinc-500">No location data</div>}
+            <div className="mt-3 text-sm text-zinc-500">Caller Location • {call.address}{hasLocation ? ` (${call.latitude}, ${call.longitude})` : ''}</div>
           </CardContent>
         </Card>
 
@@ -340,10 +380,10 @@ export default function CallViewerPage() {
           <CardContent className="space-y-3">
             <div className="text-sm text-zinc-600">Use these actions to manage the investigation workflow. All buttons are placeholder actions for the current demo.</div>
             <div className="grid gap-2">
-              <Button onClick={() => window.open(`tel:${call.caller_phone.replace(/\s/g, '')}`)}>Call Back</Button>
+              <Button onClick={() => call.caller_phone !== 'Not available' && window.open(`tel:${call.caller_phone.replace(/\s/g, '')}`)}>Call Back</Button>
               <Button variant="outline" onClick={handleDownloadReport}>Download Report</Button>
               <Button variant="outline" onClick={() => window.print()}>Print Report</Button>
-              <Button variant="outline" onClick={() => {}} >Play Audio</Button>
+              <Button variant="outline" onClick={() => call.audio_url && void new Audio(call.audio_url).play()}>Play Audio</Button>
               <Button variant="outline" onClick={() => navigate('/calls')}>Close Call</Button>
               <Button variant="outline" onClick={() => {}} >Transfer</Button>
               <Button variant="outline" onClick={() => {}} >Dispatch Again</Button>

@@ -1,59 +1,172 @@
-from fastapi import APIRouter
-from datetime import datetime, timedelta
+from __future__ import annotations
+
+from collections import Counter
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
+import uuid
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...core.database import get_db
+from ...models.emergency_call import EmergencyCall
 
 router = APIRouter()
 
+_LEVEL_LABELS = {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Moderate",
+    "moderate": "Moderate",
+    "low": "Low",
+}
+
+_TYPE_LABELS = {
+    "crime_police": "Crime / Police",
+    "medical": "Medical Emergency",
+    "police": "Police",
+    "fire": "Fire",
+    "accident": "Road Accident",
+    "women_safety": "Women Safety",
+    "domestic_violence": "Domestic Violence",
+    "child_safety": "Child Safety",
+    "cybercrime": "Cybercrime",
+    "lpg": "LPG Leak",
+    "robbery": "Robbery",
+    "assault": "Assault",
+    "harassment": "Harassment",
+    "disaster": "Natural Disaster",
+    "other": "Other",
+    "unknown": "Other",
+}
+
+
+def _get_analysis(call: EmergencyCall) -> dict[str, Any]:
+    meta = call.client_metadata or {}
+    if not isinstance(meta, dict):
+        return {}
+    res = meta.get("emergency_analysis")
+    if not isinstance(res, dict):
+        return {}
+    analysis = res.get("analysis")
+    return analysis if isinstance(analysis, dict) else {}
+
+
+def _get_level(call: EmergencyCall, analysis: dict[str, Any]) -> str:
+    raw = analysis.get("priority_level") or call.priority
+    normalized = str(raw or "").strip().lower()
+    return _LEVEL_LABELS.get(normalized, "Low")
+
+
+def _get_category(call: EmergencyCall, analysis: dict[str, Any]) -> str:
+    raw = analysis.get("emergency_type")
+    if not raw:
+        return "Other"
+    key = str(raw).strip().lower()
+    return _TYPE_LABELS.get(key, key.replace("_", " ").title())
+
 
 @router.get("/summary")
-async def summary():
-    # Return sample dashboard summary for frontend development
-    now = datetime.utcnow()
-    labels = [(now - timedelta(days=i)).strftime('%b %d') for i in range(13, -1, -1)]
-    values = [10 + (i % 5) * 3 for i in range(len(labels))]
+async def summary(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    result = await db.execute(select(EmergencyCall).order_by(EmergencyCall.created_at.desc()))
+    records = result.scalars().all()
 
-    event_status = {"Pending": 12, "Processing": 8, "Assigned": 20, "Resolved": 60}
+    now = datetime.now(UTC)
+    today = now.date()
 
-    calls_by_status = {"Pending": 12, "Processing": 8, "Assigned": 20, "Resolved": 60}
+    # 14-day call rate
+    days_14 = [today - timedelta(days=i) for i in reversed(range(14))]
+    labels_14 = [d.strftime("%b %d") for d in days_14]
+    daily_counter: Counter[date] = Counter()
 
-    calls_by_category_top5 = [
-        {"name": "Road Accident"},
-        {"name": "Medical Emergency"},
-        {"name": "Fire"},
-        {"name": "Women Safety"},
-        {"name": "Other"},
-    ]
+    category_counter: Counter[str] = Counter()
+    call_type_counter: Counter[str] = Counter()
+    status_counter: Counter[str] = Counter()
+    severity_counter: Counter[str] = Counter({"Critical": 0, "High": 0, "Moderate": 0, "Low": 0})
+    scores: list[float] = []
+    recent_critical: list[dict[str, Any]] = []
 
-    state_breakdown = [
-        {"state": "State A", "counts": {"Road Accident": 5, "Medical Emergency": 8, "Fire": 2, "Women Safety": 1, "Other": 3}},
-        {"state": "State B", "counts": {"Road Accident": 3, "Medical Emergency": 4, "Fire": 6, "Women Safety": 2, "Other": 1}},
-        {"state": "State C", "counts": {"Road Accident": 7, "Medical Emergency": 2, "Fire": 1, "Women Safety": 5, "Other": 4}},
-    ]
+    for call in records:
+        analysis = _get_analysis(call)
+        level = _get_level(call, analysis)
+        category = _get_category(call, analysis)
 
-    severity_distribution = {"Critical": 5, "Very High": 8, "High": 15, "Moderate": 30, "Low": 42}
+        severity_counter[level] += 1
+        category_counter[category] += 1
+        call_type_counter[str(call.call_type or "text").lower()] += 1
 
-    recent_critical_calls = [
-        {"id": 1, "caller_name": "John Doe", "phone": "+911234567890", "time": (now - timedelta(minutes=15)).isoformat(), "category": "Road Accident", "priority": "Critical", "score": 85, "status": "Pending"},
-        {"id": 2, "caller_name": "Jane Smith", "phone": "+919876543210", "time": (now - timedelta(hours=1)).isoformat(), "category": "Medical Emergency", "priority": "Very High", "score": 78, "status": "Assigned"},
-    ]
+        call_status = str(call.status or "received").strip()
+        status_key = call_status.replace("_", " ").title()
+        status_counter[status_key] += 1
+
+        score = analysis.get("priority_score")
+        if isinstance(score, (int, float)):
+            scores.append(float(score))
+
+        created_at = call.created_at
+        if created_at is not None:
+            created_day = (
+                created_at.astimezone(UTC).date()
+                if created_at.tzinfo
+                else created_at.date()
+            )
+            daily_counter[created_day] += 1
+
+        if level in ("Critical", "High") and len(recent_critical) < 5:
+            meta = call.client_metadata or {}
+            caller_name = meta.get("caller_name") if isinstance(meta, dict) else None
+            caller_phone = meta.get("caller_phone") if isinstance(meta, dict) else None
+            recent_critical.append({
+                "id": str(call.id),
+                "caller_name": caller_name or "Anonymous",
+                "phone": caller_phone or "Not available",
+                "time": created_at.isoformat() if created_at else now.isoformat(),
+                "category": category,
+                "priority": level,
+                "score": int(score) if isinstance(score, (int, float)) else 75,
+                "status": status_key,
+            })
+
+    total_calls = len(records)
+    critical_calls = severity_counter["Critical"]
+    todays_calls = daily_counter[today]
+    avg_score = (sum(scores) / len(scores)) if scores else 0.0
+    # Frontend divides average_severity by 100 if > 100, or displays directly
+    average_severity = round(avg_score * 100) if avg_score <= 100 else round(avg_score)
+
+    active_incidents = sum(
+        count for st, count in status_counter.items()
+        if st.lower() not in ("resolved", "closed")
+    )
+
+    top5_cats = [{"name": c} for c, _ in category_counter.most_common(5)]
+    if not top5_cats:
+        top5_cats = [{"name": "Road Accident"}, {"name": "Medical Emergency"}, {"name": "Fire"}]
 
     return {
         "updated_at": now.isoformat(),
-        "total_calls": sum(values),
-        "total_calls_delta": 3.4,
-        "critical_calls": 5,
-        "critical_calls_delta": -1.2,
-        "todays_calls": 12,
-        "todays_calls_delta": 0.5,
-        "calls_by_status": calls_by_status,
-        "active_incidents": 7,
-        "active_incidents_delta": 1.0,
-        "average_severity": 6140,  # represented as integer out of 10000 in some systems; frontend divides by 100
-        "average_severity_delta": 0.2,
-        "call_rate": {"labels": labels, "values": values},
-        "event_status": event_status,
-        "calls_by_category_top5": calls_by_category_top5,
-        "state_breakdown": state_breakdown,
-        "severity_distribution": severity_distribution,
-        "recent_critical_calls": recent_critical_calls,
-        "call_type_ratio": {"voice": 60, "sms": 30, "other": 10},
+        "total_calls": total_calls,
+        "total_calls_delta": 0.0,
+        "critical_calls": critical_calls,
+        "critical_calls_delta": 0.0,
+        "todays_calls": todays_calls,
+        "todays_calls_delta": 0.0,
+        "calls_by_status": dict(status_counter),
+        "active_incidents": active_incidents,
+        "active_incidents_delta": 0.0,
+        "average_severity": average_severity,
+        "average_severity_delta": 0.0,
+        "call_rate": {
+            "labels": labels_14,
+            "values": [daily_counter[d] for d in days_14],
+        },
+        "event_status": dict(status_counter),
+        "calls_by_category_top5": top5_cats,
+        "state_breakdown": [
+            {"state": "National / Region", "counts": dict(category_counter.most_common(5))}
+        ],
+        "severity_distribution": dict(severity_counter),
+        "recent_critical_calls": recent_critical,
+        "call_type_ratio": dict(call_type_counter),
     }

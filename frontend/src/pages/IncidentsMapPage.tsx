@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
@@ -8,6 +9,9 @@ import 'leaflet/dist/leaflet.css'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+import { listIncidents } from '@/api/incidentsApi'
+import Loading from '@/components/common/Loading'
+import ErrorMessage from '@/components/common/ErrorMessage'
 
 // Fix default icon paths for Leaflet in many bundlers
 delete (L as any).Icon.Default.prototype._getIconUrl
@@ -40,119 +44,31 @@ export default function IncidentsMapPage() {
   const [selectedId, setSelectedId] = React.useState<any>(null)
   const [selectedPos, setSelectedPos] = React.useState<any>(null)
   const [activeTab, setActiveTab] = React.useState('All')
+  const [searchText, setSearchText] = React.useState('')
+  const { data: backendIncidents = [], isLoading, error } = useQuery({
+    queryKey: ['incidents'],
+    queryFn: () => listIncidents(),
+    refetchInterval: 15000,
+    staleTime: 5000,
+  })
+  const incidents = backendIncidents.map((incident: any) => ({
+    id: incident.id,
+    title: incident.title || 'Not available',
+    incident_type: incident.incident_type || incident.category || 'Emergency',
+    severity: incident.severity ?? '—',
+    priority: incident.priority || 'Moderate',
+    priority_color: incident.priority === 'Critical' ? 'text-red-600' : incident.priority === 'High' ? 'text-amber-500' : 'text-zinc-500',
+    status: incident.status || 'Open',
+    call_count: incident.call_count ?? 1,
+    latitude: typeof incident.latitude === 'number' && !isNaN(incident.latitude) ? incident.latitude : null,
+    longitude: typeof incident.longitude === 'number' && !isNaN(incident.longitude) ? incident.longitude : null,
+    created_at: incident.created_at ? new Date(incident.created_at).toLocaleString() : 'Not available',
+  }))
+  const visibleIncidents = incidents
+    .filter((item) => activeTab === 'All' || (activeTab === 'Open' ? item.status === 'Open' : item.status === activeTab))
+    .filter((item) => `${item.title} ${item.incident_type} ${item.id}`.toLowerCase().includes(searchText.toLowerCase()))
 
-  const MOCK_INCIDENTS = [
-    {
-      id: 'INC-001',
-      title: 'Multi-vehicle collision Silvassa Main Road',
-      incident_type: 'Road Accident',
-      severity: 92,
-      priority: 'Critical',
-      priority_color: 'text-red-600',
-      status: 'Open',
-      call_count: 5,
-      latitude: 20.2766,
-      longitude: 73.0144,
-      created_at: '26 Jun 2026, 09:12',
-    },
-    {
-      id: 'INC-002',
-      title: 'Building fire GIDC Industrial Area',
-      incident_type: 'Fire',
-      severity: 85,
-      priority: 'Very High',
-      priority_color: 'text-orange-600',
-      status: 'Assigned',
-      call_count: 8,
-      latitude: 20.3689,
-      longitude: 72.9017,
-      created_at: '26 Jun 2026, 08:47',
-    },
-    {
-      id: 'INC-003',
-      title: 'Medical emergency Vapi Hospital Road',
-      incident_type: 'Medical Emergency',
-      severity: 78,
-      priority: 'Very High',
-      priority_color: 'text-orange-600',
-      status: 'Open',
-      call_count: 3,
-      latitude: 20.3714,
-      longitude: 72.9084,
-      created_at: '26 Jun 2026, 08:31',
-    },
-    {
-      id: 'INC-004',
-      title: 'Women safety incident near railway station',
-      incident_type: 'Women Safety',
-      severity: 71,
-      priority: 'High',
-      priority_color: 'text-amber-600',
-      status: 'In Progress',
-      call_count: 2,
-      latitude: 20.6,
-      longitude: 72.93,
-      created_at: '26 Jun 2026, 08:15',
-    },
-    {
-      id: 'INC-005',
-      title: 'Flash flood NH48 underpass',
-      incident_type: 'Natural Disaster',
-      severity: 80,
-      priority: 'Very High',
-      priority_color: 'text-orange-600',
-      status: 'Open',
-      call_count: 11,
-      latitude: 20.1809,
-      longitude: 72.9631,
-      created_at: '26 Jun 2026, 07:58',
-    },
-    {
-      id: 'INC-006',
-      title: 'Child abuse report Dadra sector',
-      incident_type: 'Child Abuse',
-      severity: 68,
-      priority: 'High',
-      priority_color: 'text-amber-600',
-      status: 'Assigned',
-      call_count: 1,
-      latitude: 20.2994,
-      longitude: 72.973,
-      created_at: '26 Jun 2026, 07:32',
-    },
-    {
-      id: 'INC-007',
-      title: 'Cyber fraud complaint Vapi city',
-      incident_type: 'Cyber Crime',
-      severity: 35,
-      priority: 'Low',
-      priority_color: 'text-blue-600',
-      status: 'Resolved',
-      call_count: 1,
-      latitude: 20.3716,
-      longitude: 72.9029,
-      created_at: '26 Jun 2026, 07:10',
-    },
-    {
-      id: 'INC-008',
-      title: 'Gas cylinder explosion residential area',
-      incident_type: 'Fire',
-      severity: 88,
-      priority: 'Critical',
-      priority_color: 'text-red-600',
-      status: 'Open',
-      call_count: 6,
-      latitude: 20.27,
-      longitude: 73.02,
-      created_at: '26 Jun 2026, 06:55',
-    },
-  ]
-
-  const incidents = MOCK_INCIDENTS
-  const isLoading = false
-  const refetch = async () => {}
-
-  const active = incidents.find((i: any) => i.id === selectedId) || incidents[0] || null
+  if (error) return <ErrorMessage error={error} />
 
   return (
     <div className="min-h-screen grid grid-cols-[340px_1fr]">
@@ -160,7 +76,7 @@ export default function IncidentsMapPage() {
         <div className="p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Incidents</h2>
-            <div className="px-2 py-1 bg-gray-200 rounded text-sm">{MOCK_INCIDENTS.length}</div>
+            <div className="px-2 py-1 bg-gray-200 rounded text-sm">{incidents.length}</div>
           </div>
 
           <div className="mb-3">
@@ -172,7 +88,7 @@ export default function IncidentsMapPage() {
           </div>
 
           <div className="mb-3">
-            <input placeholder="Search title, category, location" className="w-full p-2 border rounded" />
+            <input placeholder="Search title, category, location" className="w-full p-2 border rounded" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
           </div>
 
           <div className="space-y-2">
@@ -181,14 +97,12 @@ export default function IncidentsMapPage() {
                 <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
               ))
             ) : (
-              incidents
-                .filter((it: any) => (activeTab === 'All' ? true : it.status === activeTab))
-                .filter((it: any) => it.latitude !== null && it.longitude !== null)
+              visibleIncidents
                 .map((inc: any) => {
                 const priority = inc.priority || 'Low'
                 const colorClass = priority === 'Critical' ? 'bg-red-600' : priority === 'Very High' ? 'bg-orange-500' : priority === 'High' ? 'bg-amber-500' : priority === 'Moderate' ? 'bg-green-500' : 'bg-blue-500'
                 return (
-                  <div key={inc.id} onClick={() => { setSelectedId(inc.id); setSelectedPos([inc.latitude, inc.longitude]); navigate(`/incidents/${inc.id}`) }} className={`flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer ${selectedId === inc.id ? 'bg-zinc-50 border-r-2 border-r-zinc-900' : ''}`}>
+                  <div key={inc.id} onClick={() => { setSelectedId(inc.id); if (inc.latitude !== null && inc.longitude !== null) { setSelectedPos([inc.latitude, inc.longitude]); } navigate(`/incidents/${inc.id}`) }} className={`flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer ${selectedId === inc.id ? 'bg-zinc-50 border-r-2 border-r-zinc-900' : ''}`}>
                     <div style={{ width: 8, height: 32, background: colorClass }} className="mr-3 rounded-sm" />
                     <div className="flex-1 min-w-0">
                       <div className="truncate font-semibold text-sm">{inc.title}</div>
@@ -210,9 +124,8 @@ export default function IncidentsMapPage() {
       <main className="h-screen">
         <MapContainer center={INDIA_CENTER} zoom={5} style={{ height: '100%', width: '100%' }}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {incidents
-            .filter((it: any) => (activeTab === 'All' ? true : it.status === activeTab))
-            .filter((it: any) => it.latitude !== null && it.longitude !== null)
+          {visibleIncidents
+            .filter((inc: any) => inc.latitude !== null && inc.longitude !== null && !isNaN(inc.latitude) && !isNaN(inc.longitude))
             .map((inc: any) => (
             <Marker key={inc.id} position={[inc.latitude, inc.longitude]} icon={createPriorityMarker(inc.priority)} eventHandlers={{ click: (e: any) => { const map = e.target._map; map.flyTo([inc.latitude, inc.longitude], 12); setSelectedId(inc.id); setSelectedPos([inc.latitude, inc.longitude]) } }}>
               <Popup>

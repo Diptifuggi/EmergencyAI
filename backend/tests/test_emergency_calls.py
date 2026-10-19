@@ -9,7 +9,11 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
-from app.schemas.emergency_analysis import STATUS_ANALYZED, STATUS_PENDING_TRANSCRIPTION
+from app.schemas.emergency_analysis import (
+    STATUS_ANALYZING,
+    STATUS_ANALYZED,
+    STATUS_PENDING_TRANSCRIPTION,
+)
 
 
 @pytest_asyncio.fixture
@@ -64,7 +68,7 @@ async def test_create_text_emergency(async_client: AsyncClient) -> None:
 
     assert response.status_code == 201
     data = response.json()
-    assert data["status"] == STATUS_ANALYZED
+    assert data["status"] == STATUS_ANALYZING
     assert data["text_content"] == payload["text"]
     assert data["language"] == "en-IN"
     assert data["requested_language"] == "en-IN"
@@ -75,8 +79,11 @@ async def test_create_text_emergency(async_client: AsyncClient) -> None:
     assert data["location_timestamp"].startswith("2026-08-27T10:30:00")
     assert data["location_address"] == "Anand, Gujarat, India"
     assert data["location_status"] == "captured"
-    assert "emergency_analysis" in data["client_metadata"]
     assert uuid.UUID(data["id"])
+    saved = await async_client.get(f"/api/v1/emergency-calls/{data['id']}")
+    assert saved.status_code == 200
+    assert saved.json()["status"] == STATUS_ANALYZED
+    assert "emergency_analysis" in saved.json()["client_metadata"]
 
 
 @pytest.mark.asyncio
@@ -168,10 +175,13 @@ async def test_create_voice_and_text(async_client: AsyncClient, tmp_path: Path) 
     assert body["call_type"] == "voice_text"
     assert body["transcription"] == "Help needed at the highway junction"
     assert body["text_content"] == "Help needed at the highway junction"
-    assert body["status"] == STATUS_ANALYZED
+    assert body["status"] == STATUS_ANALYZING
     assert body["client_metadata"]["device"] == "test"
-    assert "emergency_analysis" in body["client_metadata"]
     assert body["audio_url"] is not None
+    saved = await async_client.get(f"/api/v1/emergency-calls/{body['id']}")
+    assert saved.status_code == 200
+    assert saved.json()["status"] == STATUS_ANALYZED
+    assert "emergency_analysis" in saved.json()["client_metadata"]
 
 
 @pytest.mark.asyncio

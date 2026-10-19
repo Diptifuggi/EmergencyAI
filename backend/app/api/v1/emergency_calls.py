@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -12,9 +13,11 @@ from typing import Any
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Request,
@@ -23,7 +26,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import BASE_DIR, settings
@@ -34,11 +37,15 @@ from ...core.logger import get_logger
 from ...models.emergency_call import EmergencyCall
 from ...schemas.emergency_call import (
     EmergencyCallListOut,
+    EmergencyCallManualCreate,
     EmergencyCallOut,
     EmergencyCallTextCreate,
     EmergencyCallUpdate,
 )
-from ...services.emergency_call_analysis_runner import run_post_create_analysis
+from ...services.emergency_call_analysis_runner import (
+    has_analyzable_transcript,
+    run_post_create_analysis_in_background,
+)
 from ...services.location_service import reverse_geocode
 
 
@@ -109,6 +116,42 @@ def _validate_coordinates(latitude: float | None, longitude: float | None, accur
 def _location_status(latitude: float | None, longitude: float | None) -> str:
     """Return the persisted location state from a complete GPS coordinate pair."""
     return "captured" if latitude is not None and longitude is not None else "unavailable"
+
+
+def _validated_idempotency_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    key = value.strip()
+    if not key or not key.isascii() or len(key) > 128 or not all(
+        character.isalnum() or character in "-._~" for character in key
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Idempotency-Key must contain 1-128 safe characters",
+        )
+    return key
+
+
+async def _find_idempotent_emergency(
+    db: AsyncSession,
+    idempotency_key: str | None,
+) -> EmergencyCall | None:
+    if idempotency_key is None:
+        return None
+    return await db.scalar(
+        select(EmergencyCall).where(EmergencyCall.idempotency_key == idempotency_key)
+    )
+
+
+def _schedule_emergency_analysis(
+    background_tasks: BackgroundTasks,
+    emergency: EmergencyCall,
+) -> None:
+    if has_analyzable_transcript(emergency):
+        background_tasks.add_task(
+            run_post_create_analysis_in_background,
+            emergency.id,
+        )
 
 
 def _parse_metadata(raw: str | None) -> dict[str, Any] | None:
@@ -200,12 +243,9 @@ def convert_uploaded_audio_to_mp3(audio_bytes: bytes, original_filename: str) ->
             check=False,
         )
         if completed.returncode != 0:
-            stderr = (completed.stderr or "").strip()
             logger.warning(
-                "Audio conversion failed filename=%s inputBytes=%d: %s",
-                original_filename,
+                "Audio conversion failed error_type=ffmpeg_nonzero_exit inputBytes=%d",
                 len(audio_bytes),
-                stderr or "unknown ffmpeg error",
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -214,7 +254,7 @@ def convert_uploaded_audio_to_mp3(audio_bytes: bytes, original_filename: str) ->
 
         converted_bytes = output_path.read_bytes()
         if not converted_bytes:
-            logger.warning("Audio conversion produced empty output filename=%s inputBytes=%d", original_filename, len(audio_bytes))
+            logger.warning("Audio conversion produced empty output inputBytes=%d", len(audio_bytes))
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Uploaded audio conversion produced no audio data",
@@ -235,8 +275,7 @@ async def _save_audio_file(file: UploadFile) -> tuple[str, str, str, int]:
 
     contents = await file.read()
     logger.info(
-        "Audio upload received filename=%s contentType=%s bytes=%d field=file",
-        filename,
+        "Audio upload received contentType=%s bytes=%d field=file",
         file.content_type or "unknown",
         len(contents),
     )
@@ -246,7 +285,7 @@ async def _save_audio_file(file: UploadFile) -> tuple[str, str, str, int]:
             detail="Uploaded audio is empty. Please record again.",
         )
     if ext == ".mp3" and not _looks_like_mp3(contents):
-        logger.warning("Audio upload rejected invalid MP3 filename=%s bytes=%d", filename, len(contents))
+        logger.warning("Audio upload rejected invalid MP3 bytes=%d", len(contents))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded MP3 does not contain a valid audio header",
@@ -259,7 +298,7 @@ async def _save_audio_file(file: UploadFile) -> tuple[str, str, str, int]:
     if not converted_bytes:
         raise HTTPException(status_code=400, detail="Uploaded audio is empty after conversion")
     if converted_ext == ".mp3" and not _looks_like_mp3(converted_bytes):
-        logger.warning("Audio conversion produced invalid MP3 filename=%s bytes=%d", filename, len(converted_bytes))
+        logger.warning("Audio conversion produced invalid MP3 bytes=%d", len(converted_bytes))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded audio could not be converted to a valid MP3",
@@ -278,11 +317,9 @@ async def _save_audio_file(file: UploadFile) -> tuple[str, str, str, int]:
     relative_path = str(Path("backend") / "storage" / "audio" / unique_filename)
     final_size = target_path.stat().st_size
     logger.info(
-        "Audio upload stored filename=%s receivedBytes=%d writtenBytes=%d finalPath=%s",
-        filename,
+        "Audio upload stored receivedBytes=%d writtenBytes=%d",
         len(contents),
         len(converted_bytes),
-        relative_path,
     )
     if final_size != len(converted_bytes):
         raise HTTPException(status_code=500, detail="Stored audio size verification failed")
@@ -313,8 +350,17 @@ async def _save_map_snapshot(file: UploadFile) -> tuple[str, str, str, int]:
 @router.post("/text", response_model=EmergencyCallOut, status_code=status.HTTP_201_CREATED)
 async def create_text_emergency(
     payload: EmergencyCallTextCreate,
+    background_tasks: BackgroundTasks,
+    idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
+    started_at = time.perf_counter()
+    idempotency_key = _validated_idempotency_key(idempotency_header)
+    existing = await _find_idempotent_emergency(db, idempotency_key)
+    if existing is not None:
+        logger.info("Idempotent emergency retry reused emergency_id=%s", existing.id)
+        return existing
+
     requested_language = _validate_language(payload.language)
     metadata = dict(payload.client_metadata or {})
     metadata.setdefault("requested_language", requested_language)
@@ -330,28 +376,92 @@ async def create_text_emergency(
         location_status=_location_status(payload.latitude, payload.longitude),
         source=payload.source,
         priority=payload.priority,
+        idempotency_key=idempotency_key,
         client_metadata=metadata,
-        status="received",
+        status="analyzing" if payload.text.strip() else "received",
     )
 
+    try:
+        db.add(emergency)
+        database_started_at = time.perf_counter()
+        await db.commit()
+        await db.refresh(emergency)
+        logger.info(
+            "Emergency database persistence complete emergency_id=%s elapsed_ms=%.1f",
+            emergency.id,
+            (time.perf_counter() - database_started_at) * 1000,
+        )
+    except IntegrityError as exc:
+        await db.rollback()
+        existing = await _find_idempotent_emergency(db, idempotency_key)
+        if existing is not None:
+            logger.info("Concurrent idempotent retry reused emergency_id=%s", existing.id)
+            return existing
+        logger.error("Failed to persist text emergency error_type=%s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Emergency storage is temporarily unavailable",
+        ) from exc
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        logger.error("Failed to persist text emergency error_type=%s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Emergency storage is temporarily unavailable",
+        ) from exc
+
+    _schedule_emergency_analysis(background_tasks, emergency)
+    logger.info(
+        "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
+        emergency.id,
+        (time.perf_counter() - started_at) * 1000,
+        has_analyzable_transcript(emergency),
+    )
+    return emergency
+
+
+@router.post("/manual", response_model=EmergencyCallOut, status_code=status.HTTP_201_CREATED)
+async def create_manual_emergency(
+    payload: EmergencyCallManualCreate,
+    db: AsyncSession = Depends(get_db),
+) -> EmergencyCall:
+    """Persist caller/operator metadata without fabricating emergency text."""
+    _validate_coordinates(payload.latitude, payload.longitude, None)
+    metadata = {
+        "caller_name": payload.caller_name,
+        "caller_phone": payload.caller_phone,
+        "call_started_at": payload.started_at.isoformat() if payload.started_at else None,
+        "platform": "react_operator",
+    }
+    emergency = EmergencyCall(
+        call_type="manual",
+        status="received",
+        priority="normal",
+        source=payload.source,
+        client_metadata=metadata,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        location_address=await _location_address(payload.latitude, payload.longitude),
+        location_status=_location_status(payload.latitude, payload.longitude),
+    )
     try:
         db.add(emergency)
         await db.commit()
         await db.refresh(emergency)
     except SQLAlchemyError as exc:
         await db.rollback()
-        logger.exception("Failed to persist text emergency: %s", exc)
+        logger.exception("Failed to persist manual emergency: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Emergency storage is temporarily unavailable",
         ) from exc
-
-    return await run_post_create_analysis(db, emergency)
+    return emergency
 
 
 @router.post("/audio", response_model=EmergencyCallOut, status_code=status.HTTP_201_CREATED)
 async def create_audio_emergency(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     language: str = Form(...),
     transcription: str | None = Form(None),
@@ -361,8 +471,10 @@ async def create_audio_emergency(
     location_timestamp: str | None = Form(None),
     source: str = Form("flutter"),
     priority: str = Form("normal"),
+    existing_call_id: uuid.UUID | None = Form(None),
     client_metadata: str | None = Form(None),
     map_snapshot: UploadFile | None = File(None),
+    idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """
@@ -374,14 +486,104 @@ async def create_audio_emergency(
     - transcription: text of the voice (optional; recommended from Flutter STT)
     - latitude / longitude / source / priority / client_metadata (optional JSON string)
     """
+    started_at = time.perf_counter()
+    idempotency_key = _validated_idempotency_key(idempotency_header)
+    existing_by_key = await _find_idempotent_emergency(db, idempotency_key)
+    if existing_by_key is not None:
+        logger.info("Idempotent emergency retry reused emergency_id=%s", existing_by_key.id)
+        return existing_by_key
+
     _validate_coordinates(latitude, longitude, location_accuracy)
     requested_language = _validate_language(language)
     cleaned_language = _persisted_language(requested_language)
+    existing_emergency = await db.get(EmergencyCall, existing_call_id) if existing_call_id else None
+    if existing_call_id and existing_emergency is None:
+        raise HTTPException(status_code=404, detail="Emergency call not found")
     relative_path, original_name, content_type, size_bytes = await _save_audio_file(file)
     snapshot_data = await _save_map_snapshot(map_snapshot) if map_snapshot else None
     meta = _parse_metadata(client_metadata) or {}
     meta.setdefault("requested_language", requested_language)
     cleaned_transcription = (transcription or "").strip() or None
+
+    if existing_emergency is not None:
+        existing_metadata = dict(existing_emergency.client_metadata or {})
+        existing_metadata.update(meta)
+        existing_emergency.client_metadata = existing_metadata
+        if idempotency_key is not None:
+            existing_emergency.idempotency_key = idempotency_key
+        existing_emergency.audio_file_path = relative_path
+        existing_emergency.original_audio_filename = original_name
+        existing_emergency.audio_content_type = content_type
+        existing_emergency.audio_file_size = size_bytes
+        existing_emergency.audio_url = str(
+            request.url_for("get_emergency_audio_file", call_id=existing_emergency.id)
+        )
+        existing_emergency.language = cleaned_language or existing_emergency.language
+        existing_emergency.transcription = cleaned_transcription
+        existing_emergency.text_content = cleaned_transcription or existing_emergency.text_content
+        existing_emergency.status = "received" if cleaned_transcription else "pending_transcription"
+        if cleaned_transcription:
+            existing_emergency.status = "analyzing"
+        if latitude is not None:
+            existing_emergency.latitude = latitude
+        if longitude is not None:
+            existing_emergency.longitude = longitude
+        if location_accuracy is not None:
+            existing_emergency.location_accuracy = location_accuracy
+        if location_timestamp is not None:
+            existing_emergency.location_timestamp = _parse_location_timestamp(location_timestamp)
+        if existing_emergency.latitude is not None and existing_emergency.longitude is not None:
+            existing_emergency.location_address = await _location_address(
+                existing_emergency.latitude,
+                existing_emergency.longitude,
+            )
+        existing_emergency.location_status = _location_status(
+            existing_emergency.latitude,
+            existing_emergency.longitude,
+        )
+        if snapshot_data:
+            existing_emergency.map_snapshot_file_path = snapshot_data[0]
+            existing_emergency.map_snapshot_filename = snapshot_data[1]
+            existing_emergency.map_snapshot_content_type = snapshot_data[2]
+            existing_emergency.map_snapshot_size = snapshot_data[3]
+            existing_emergency.map_snapshot_url = str(
+                request.url_for("get_emergency_map_snapshot", call_id=existing_emergency.id)
+            )
+        try:
+            database_started_at = time.perf_counter()
+            await db.commit()
+            await db.refresh(existing_emergency)
+            logger.info(
+                "Emergency database persistence complete emergency_id=%s elapsed_ms=%.1f",
+                existing_emergency.id,
+                (time.perf_counter() - database_started_at) * 1000,
+            )
+        except IntegrityError as exc:
+            await db.rollback()
+            duplicate = await _find_idempotent_emergency(db, idempotency_key)
+            if duplicate is not None:
+                logger.info("Concurrent idempotent retry reused emergency_id=%s", duplicate.id)
+                return duplicate
+            logger.error("Failed to attach audio to emergency error_type=%s", type(exc).__name__)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Emergency storage is temporarily unavailable",
+            ) from exc
+        except SQLAlchemyError as exc:
+            await db.rollback()
+            logger.error("Failed to attach audio to emergency error_type=%s", type(exc).__name__)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Emergency storage is temporarily unavailable",
+            ) from exc
+        _schedule_emergency_analysis(background_tasks, existing_emergency)
+        logger.info(
+            "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
+            existing_emergency.id,
+            (time.perf_counter() - started_at) * 1000,
+            has_analyzable_transcript(existing_emergency),
+        )
+        return existing_emergency
 
     status_value = "received" if cleaned_transcription else "pending_transcription"
     emergency = EmergencyCall(
@@ -396,6 +598,7 @@ async def create_audio_emergency(
         transcription=cleaned_transcription,
         text_content=cleaned_transcription,
         source=(source or "flutter").strip() or "flutter",
+        idempotency_key=idempotency_key,
         client_metadata=meta,
         latitude=latitude,
         longitude=longitude,
@@ -419,17 +622,43 @@ async def create_audio_emergency(
             emergency.map_snapshot_url = str(
                 request.url_for("get_emergency_map_snapshot", call_id=emergency.id)
             )
+        if cleaned_transcription:
+            emergency.status = "analyzing"
+        database_started_at = time.perf_counter()
         await db.commit()
         await db.refresh(emergency)
+        logger.info(
+            "Emergency database persistence complete emergency_id=%s elapsed_ms=%.1f",
+            emergency.id,
+            (time.perf_counter() - database_started_at) * 1000,
+        )
+    except IntegrityError as exc:
+        await db.rollback()
+        duplicate = await _find_idempotent_emergency(db, idempotency_key)
+        if duplicate is not None:
+            logger.info("Concurrent idempotent retry reused emergency_id=%s", duplicate.id)
+            return duplicate
+        logger.error("Failed to persist audio emergency metadata error_type=%s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Emergency storage is temporarily unavailable",
+        ) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
-        logger.exception("Failed to persist audio emergency metadata: %s", exc)
+        logger.error("Failed to persist audio emergency metadata error_type=%s", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Emergency storage is temporarily unavailable",
         ) from exc
 
-    return await run_post_create_analysis(db, emergency)
+    _schedule_emergency_analysis(background_tasks, emergency)
+    logger.info(
+        "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
+        emergency.id,
+        (time.perf_counter() - started_at) * 1000,
+        has_analyzable_transcript(emergency),
+    )
+    return emergency
 
 
 @router.post(
@@ -440,6 +669,7 @@ async def create_audio_emergency(
 )
 async def create_voice_and_text_emergency(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     transcription: str = Form(...),
     language: str = Form(...),
@@ -451,9 +681,17 @@ async def create_voice_and_text_emergency(
     priority: str = Form("normal"),
     client_metadata: str | None = Form(None),
     map_snapshot: UploadFile | None = File(None),
+    idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """Requires both audio file and its text. Prefer this from the Flutter app."""
+    started_at = time.perf_counter()
+    idempotency_key = _validated_idempotency_key(idempotency_header)
+    existing = await _find_idempotent_emergency(db, idempotency_key)
+    if existing is not None:
+        logger.info("Idempotent emergency retry reused emergency_id=%s", existing.id)
+        return existing
+
     _validate_coordinates(latitude, longitude, location_accuracy)
     requested_language = _validate_language(language)
     cleaned_language = _persisted_language(requested_language)
@@ -472,12 +710,13 @@ async def create_voice_and_text_emergency(
     emergency = EmergencyCall(
         call_type="voice_text",
         language=cleaned_language,
-        status="received",
+        status="analyzing",
         priority=(priority or "normal").strip() or "normal",
         audio_file_path=relative_path,
         original_audio_filename=original_name,
         audio_content_type=content_type,
         audio_file_size=size_bytes,
+        idempotency_key=idempotency_key,
         transcription=cleaned,
         text_content=cleaned,
         source=(source or "flutter").strip() or "flutter",
@@ -504,17 +743,41 @@ async def create_voice_and_text_emergency(
             emergency.map_snapshot_url = str(
                 request.url_for("get_emergency_map_snapshot", call_id=emergency.id)
             )
+        database_started_at = time.perf_counter()
         await db.commit()
         await db.refresh(emergency)
+        logger.info(
+            "Emergency database persistence complete emergency_id=%s elapsed_ms=%.1f",
+            emergency.id,
+            (time.perf_counter() - database_started_at) * 1000,
+        )
+    except IntegrityError as exc:
+        await db.rollback()
+        existing = await _find_idempotent_emergency(db, idempotency_key)
+        if existing is not None:
+            logger.info("Concurrent idempotent retry reused emergency_id=%s", existing.id)
+            return existing
+        logger.error("Failed to persist voice+text emergency error_type=%s", type(exc).__name__)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Emergency storage is temporarily unavailable",
+        ) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
-        logger.exception("Failed to persist voice+text emergency: %s", exc)
+        logger.error("Failed to persist voice+text emergency error_type=%s", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Emergency storage is temporarily unavailable",
         ) from exc
 
-    return await run_post_create_analysis(db, emergency)
+    _schedule_emergency_analysis(background_tasks, emergency)
+    logger.info(
+        "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
+        emergency.id,
+        (time.perf_counter() - started_at) * 1000,
+        has_analyzable_transcript(emergency),
+    )
+    return emergency
 
 
 @router.get("/", response_model=EmergencyCallListOut)

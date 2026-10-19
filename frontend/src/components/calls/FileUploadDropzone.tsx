@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { UploadCloud } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui'
 import callsApi from '@/api/callsApi'
-import axiosClient from '@/api/axiosClient'
 import { toast } from 'react-hot-toast'
 
 const MAX_SIZE = 50 * 1024 * 1024 // 50MB
@@ -15,7 +14,6 @@ export default function FileUploadDropzone({ callId, onComplete }) {
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState(null)
   const inputRef = useRef(null)
-  const pollRef = useRef(null)
 
   const validateFile = (file) => {
     if (!file) return { ok: false, reason: 'No file' }
@@ -39,42 +37,15 @@ export default function FileUploadDropzone({ callId, onComplete }) {
     const controller = new AbortController()
     uploadControllerRef.current = controller
     try {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await axiosClient.post(`/uploads/audio/${callId}`, form, {
-        signal: controller.signal,
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (evt) => { if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100)) },
-        timeout: 120000,
-      })
-      const data = res.data
-      setState('processing')
-      // start polling /uploads/status/{callId} until scored/resolved/failed
-      const stopStatuses = ['Scored','Resolved','Failed','Completed']
-      const poll = async () => {
-        try {
-          const st = await callsApi.getPipelineStatus(callId)
-          const status = st?.status || st?.pipeline_status || st?.state || ''
-          if (stopStatuses.includes(status)) {
-            setState('done')
-            setResult(st)
-            if (onComplete) onComplete(st)
-            clearInterval(pollRef.current)
-            pollRef.current = null
-            return
-          }
-        } catch (e) {
-          // if 404 or not implemented, stop polling and mark done
-          clearInterval(pollRef.current)
-          pollRef.current = null
-          setState('done')
-          setResult(null)
-          if (onComplete) onComplete(null)
-        }
-      }
-      pollRef.current = setInterval(poll, 2000)
-      // run first poll immediately
-      await poll()
+      const data = await callsApi.uploadAudio(
+        callId,
+        file,
+        (evt) => { if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100)) },
+        controller.signal,
+      )
+      setState('done')
+      setResult(data)
+      if (onComplete) onComplete(data)
     } catch (e) {
       if (e?.name === 'CanceledError' || e?.code === 'ERR_CANCELED') {
         toast.error('Upload canceled')
@@ -99,7 +70,7 @@ export default function FileUploadDropzone({ callId, onComplete }) {
   }
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    return () => { if (uploadControllerRef.current) uploadControllerRef.current.abort() }
   }, [])
 
   const onDrop = (e) => {
@@ -138,8 +109,8 @@ export default function FileUploadDropzone({ callId, onComplete }) {
             </div>
           ) : state === 'done' ? (
             <div className="flex flex-col items-center">
-              <div className="text-sm font-semibold mb-2">Processing complete</div>
-              <Button onClick={() => { if (onComplete) onComplete(result); }}>View Full Analysis</Button>
+              <div className="text-sm font-semibold mb-2">Audio upload complete</div>
+              <Button onClick={() => { if (onComplete) onComplete(result); }}>View Call</Button>
             </div>
           ) : state === 'error' ? (
             <div className="text-red-600">Upload failed. <Button onClick={() => setState('idle')}>Retry</Button></div>

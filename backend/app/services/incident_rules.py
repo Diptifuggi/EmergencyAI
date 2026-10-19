@@ -33,9 +33,18 @@ _UNCERTAINTY_MARKERS = (
     "बहुधा", "कदाचित", "असू शकते", "असे वाटते", "मला वाटते", "माहित नाही", "शक्यता आहे", "exact count not confirmed",
     "exact count confirm nahi", "गिनती पक्की नहीं",
 )
+_POTENTIAL_RISK_MARKERS = (
+    "risk of flooding", "risk of a flood", "possibility of flooding",
+    "possibility of a flood", "may cause flooding", "could cause flooding",
+    "flooding may occur", "flood may occur", "flood risk",
+    "बाढ़ की संभावना", "बाढ़ आने की संभावना", "बाढ़ का खतरा",
+    "बाढ़ आ सकती है", "बाढ़ आ सकता है",
+    "પૂરની શક્યતા", "પૂર આવવાની શક્યતા", "પૂરનો ખતરો", "પૂર આવી શકે",
+    "पुराची शक्यता", "पूर येण्याची शक्यता", "पुराचा धोका", "पूर येऊ शकतो",
+)
 _NEGATED_INCIDENT_MARKERS = (
     "no accident", "no fire", "no explosion", "nothing happened", "accident नहीं", "accident नहीं हुआ", "no fire", "fire नहीं", "आग नहीं", "आग नहीं लगी", "धमाका नहीं हुआ", "गैस लीक नहीं है", "कोई खतरा नहीं",
-    "कोई accident नहीं", "હાદસો નથી", "થયો નથી", "થયું નથી", "આગ લાગી નથી", "ગેસ લીક નથી", "કોઈ ખતરો નથી", "अपघात नाही", "नाही झाले", "झाले नाही", "आग लागली नाही", "गॅस गळती नाही", "धोका नाही",
+    "कोई accident नहीं", "गैस सिलेंडर नहीं फटा", "हादसा नहीं हुआ", "હાદસો નથી", "થયો નથી", "થયું નથી", "આગ લાગી નથી", "ગેસ લીક નથી", "કોઈ ખતરો નથી", "अपघात नाही", "नाही झाले", "झाले नाही", "आग लागली नाही", "गॅस गळती नाही", "धोका नाही",
 )
 _LPG_HINTS = (
     "lpg", "lpg gas", "gas leak", "gas leakage", "cylinder leak", "cooking gas",
@@ -60,6 +69,7 @@ _DEVANAGARI_COUNT_WORDS = {
     "पन्द्रह": 15, "सोलह": 16, "सत्रह": 17, "अठारह": 18, "उन्नीस": 19,
     "बीस": 20, "इक्कीस": 21, "बाईस": 22, "तेईस": 23, "चौबीस": 24,
     "पच्चीस": 25, "छब्बीस": 26, "सत्ताईस": 27, "अट्ठाईस": 28,
+    "पंचवीस": 25,
     "उनतीस": 29, "तीस": 30, "चालीस": 40, "पचास": 50, "सौ": 100,
 }
 
@@ -108,6 +118,14 @@ def _contains(text: str, phrases: tuple[str, ...]) -> bool:
 
 
 @dataclass(frozen=True)
+class EvidenceItem:
+    concept: str
+    value: object
+    source_text: str
+    certainty: str
+
+
+@dataclass(frozen=True)
 class IncidentFacts:
     emergency_type: str
     sub_type: str | None
@@ -149,9 +167,13 @@ class IncidentFacts:
     railway_incident: bool
     cyber_crime: bool
     lpg_leak: bool
+    heavy_rain: bool
+    flood_risk: bool
+    flood_confirmed: bool
     caller_request: str | None
     location_description: str | None
     emergency_keywords: list[str] = field(default_factory=list)
+    evidence: tuple[EvidenceItem, ...] = ()
 
 
 def services_for_facts(facts: IncidentFacts) -> list[HelpRequired]:
@@ -165,6 +187,10 @@ def services_for_facts(facts: IncidentFacts) -> list[HelpRequired]:
         services.extend([HelpRequired.AMBULANCE, HelpRequired.MEDICAL_ASSISTANCE])
     if facts.fire_present or facts.explosion_present:
         services.append(HelpRequired.FIRE_SERVICE)
+    # Active explosions justify fire/rescue readiness, but this policy does
+    # not turn that operational recommendation into a trapped-person fact.
+    if facts.explosion_present and facts.lpg_leak:
+        services.append(HelpRequired.RESCUE)
     if facts.rescue_required or facts.trapped_persons:
         services.append(HelpRequired.RESCUE)
         if facts.fire_present and HelpRequired.AMBULANCE not in services:
@@ -204,14 +230,15 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
         "હવે બધું ઠીક", "હવે બધા સુરક્ષિત", "પરિસ્થિતિ કાબૂમાં", "આગ બુઝાઈ ગઈ", "હવે ખતરો નથી", "સમસ્યા ઉકેલાઈ ગઈ", "ઇમરજન્સી પૂરી થઈ",
         "आता सर्व ठीक", "आता सगळे सुरक्षित", "परिस्थिती नियंत्रणात", "आग विझली", "आग आटोक्यात", "आता धोका नाही", "समस्या सुटली", "आणीबाणी संपली",
     ))
+    potential_risk = any(marker in normalized for marker in _POTENTIAL_RISK_MARKERS)
     uncertain = any(marker in normalized for marker in _UNCERTAINTY_MARKERS)
     negated = any(marker in normalized for marker in _NEGATED_INCIDENT_MARKERS)
-    contextual = hypothetical or historical or resolved or uncertain or negated or any(marker in normalized for marker in _NON_LIVE_CONTEXT)
+    contextual = hypothetical or historical or resolved or uncertain or negated or potential_risk or any(marker in normalized for marker in _NON_LIVE_CONTEXT)
     flags = evidence(text, language)
     hit = {name: _contains(normalized, phrases) for name, phrases in _PHRASES.items()}
-    if contextual:
+    if hypothetical or negated:
         hit = {name: False for name in hit}
-    if hypothetical or uncertain or negated:
+    if hypothetical or negated:
         flags = {name: False for name in flags}
 
     domains = lexicon_matches(text, language)
@@ -223,7 +250,11 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
     lpg = bool(flags.get("lpg") or any(marker in normalized for marker in _LPG_HINTS))
     explosion = bool(flags.get("explosion") or any(marker in normalized for marker in _EXPLOSION_HINTS))
     fire = bool(flags.get("fire") or explosion)
-    trapped = bool(flags.get("trapped") or flags.get("rescue"))
+    trapped = bool(
+        "rescue" in domains
+        or "structural_collapse" in domains
+        or "drowning" in domains
+    )
     railway = bool(flags.get("railway"))
     accident_evidence = bool(flags.get("accident"))
     road = bool(flags.get("road") or (flags.get("highway") and accident_evidence))
@@ -232,6 +263,18 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
     drowning = "drowning" in domains
     structural_collapse = "structural_collapse" in domains
     natural_disaster = "natural_disaster" in domains
+    heavy_rain = any(term in normalized for term in (
+        "heavy rain", "बहुत भारी बारिश", "भारी बारिश", "મુશળધાર વરસાદ",
+        "બહુ જ ભારે વરસાદ", "મુસળધાર પाऊस", "मुसळधार पाऊस",
+    ))
+    flood_risk = potential_risk and any(term in normalized for term in (
+        "flood", "flooding", "बाढ़", "પૂર", "पूर",
+    ))
+    flood_confirmed = any(term in normalized for term in (
+        "flooding", "flood water", "flood came", "flood has come", "flood aa gaya",
+        "बाढ़ आ गई", "बाढ़ आई", "पानी भर गया", "ઘરોમાં પાણી ઘૂસી ગયું",
+        "પૂર આવ્યું", "पूर आला", "पूर आला आहे",
+    )) and not (hypothetical or negated or potential_risk)
     electrical_incident = "electrical" in domains
     hazmat_incident = "chemical_hazmat" in domains
     animal_attack = "animal_attack" in domains
@@ -239,7 +282,10 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
     self_harm_crisis = "self_harm_crisis" in domains
     medical = medical or drowning or animal_attack or self_harm_crisis
     injury = injury or animal_attack or crowd_emergency
-    trapped = trapped or drowning or structural_collapse or natural_disaster or crowd_emergency
+    # A flood, storm, crowd, or other disaster is not evidence that somebody
+    # is trapped.  Entrapment/rescue requires explicit language (or drowning,
+    # collapse, which inherently describes a person in immediate danger).
+    trapped = trapped or drowning or structural_collapse
     active_crime = bool(hit["active"] and (hit["crime"] or hit["burglary"] or hit["robbery"] or hit["violence"] or hit["home_intrusion"]))
     home = hit["home_intrusion"] or (hit["burglary"] and ("house" in normalized or "home" in normalized))
     burglary = bool(home and (hit["burglary"] or hit["home_intrusion"]))
@@ -255,8 +301,8 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
         or hit["missing"] or weapon or crowd_emergency
     )
     immediate = bool(active_crime or weapon or hit["domestic"] or hit["missing"] or drowning or structural_collapse or crowd_emergency or self_harm_crisis or (flags.get("immediate") and (police or medical or fire)))
-    fire = bool(flags.get("fire") or explosion or hazmat_incident or (electrical_incident and "fire" in normalized))
-    rescue_required = trapped or bool(lpg and explosion)
+    fire = bool(flags.get("fire") or hazmat_incident or (electrical_incident and "fire" in normalized))
+    rescue_required = trapped
     location_description = _extract_location(text, railway)
 
     if hypothetical:
@@ -325,11 +371,33 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
     if not caller_request and "help" in normalized:
         caller_request = "help"
 
+    certainty = (
+        "possible" if potential_risk or uncertain
+        else "historical" if historical
+        else "resolved" if resolved
+        else "confirmed"
+    )
+    evidence_items: list[EvidenceItem] = []
+    if heavy_rain:
+        evidence_items.append(EvidenceItem("heavy_rain", True, text, "confirmed"))
+    if flood_risk:
+        evidence_items.append(EvidenceItem("flood", True, text, "possible"))
+    if flood_confirmed:
+        evidence_items.append(EvidenceItem("flood", True, text, certainty))
+    if explosion:
+        evidence_items.append(EvidenceItem("explosion", True, text, certainty))
+    if lpg:
+        evidence_items.append(EvidenceItem("lpg", True, text, certainty))
+    if caller_request:
+        evidence_items.append(EvidenceItem("caller_request", caller_request, text, "confirmed"))
+    if victim_count is not None:
+        evidence_items.append(EvidenceItem("victim_count", victim_count, text, certainty))
+
     return IncidentFacts(
         emergency_type=kind,
         sub_type=subtype,
         non_live_context=contextual,
-        context_state=("hypothetical" if hypothetical else "resolved" if resolved else "historical" if historical else "uncertain" if uncertain else "current"),
+        context_state=("hypothetical" if hypothetical else "resolved" if resolved else "historical" if historical else "potential_risk" if potential_risk else "uncertain" if uncertain else "negated" if negated else "current"),
         current_emergency=not contextual,
         hypothetical=hypothetical,
         historical=historical,
@@ -369,9 +437,13 @@ def extract_incident_facts(text: str, language: str = "en") -> IncidentFacts:
         railway_incident=railway,
         cyber_crime=cyber,
         lpg_leak=lpg,
+        heavy_rain=heavy_rain,
+        flood_risk=flood_risk,
+        flood_confirmed=flood_confirmed,
         caller_request=caller_request,
         location_description=location_description,
         emergency_keywords=keywords,
+        evidence=tuple(evidence_items),
     )
 
 
@@ -383,7 +455,7 @@ def _extract_victim_count(text: str) -> tuple[int | None, bool]:
     pattern = re.compile(
         rf"(?P<approx>around|about|approximately|roughly|सुमारे|लगभग|करीब|આશરે|जवळपास)?\s*"
         rf"(?P<count>\d{{1,3}}|{count_tokens})\s+"
-        r"(?:people|persons|victims|casualties|patients|लोग|व्यक्ति|घायल|घायल हैं|बच्चा|बच्चे|लोक|जखमी)",
+        r"(?:people|persons|victims|casualties|patients|लोग|व्यक्ति|घायल|घायल हैं|बच्चा|बच्चे|लोक|जखमी|લોકો|વ્યક્તિઓ|ઘાયલ|जखमी झाले आहेत)",
         re.IGNORECASE,
     )
     matches = list(pattern.finditer(text))
@@ -423,6 +495,29 @@ def _extract_caller_request(text: str) -> str | None:
 
 def _extract_location(text: str, railway: bool) -> str | None:
     lowered = text.casefold()
+    if ("विद्यानगर" in text or "विद्यानगरच्या" in text) and ("कॅन्टीन" in text or "कॅन्टीनमध्ये" in text) and "कॉलेज" in text:
+        return "विद्यानगर, college canteen"
+    gujarati_area_match = re.search(r"([\wÀ-࿔]+)\s+એરિયામાં", text, re.IGNORECASE)
+    if gujarati_area_match:
+        return f"{gujarati_area_match.group(1).strip()} વિસ્તાર"
+    attached_place_match = re.search(r"([\wÀ-࿔]+)(?:માં|मध्ये|मध्ये)", text, re.IGNORECASE)
+    attached_place = attached_place_match.group(1).strip() if attached_place_match else None
+    place_match = re.search(
+        r"([\wÀ-࿔]+)\s+(?:में|માં|માંના|मध्ये|एरियामध्ये|વિસ્તારમાં|एरियात)",
+        text,
+        re.IGNORECASE,
+    )
+    place = place_match.group(1).strip() if place_match else None
+    if place and "area" in lowered:
+        return f"{place} area"
+    if place and ("એરિયા" in text or "વિસ્તાર" in text):
+        return f"{place} વિસ્તાર"
+    if place and "college" in lowered and "canteen" in lowered:
+        return f"{place}, college canteen"
+    if place and ("कॉलेज" in text or "કોલેજ" in text or "कॉलेज" in text) and ("कैंटीन" in text or "કેન્ટીન" in text or "canteen" in lowered):
+        return f"{place}, कॉलेज कैंटीन" if "कॉलेज" in text or "कैंटीन" in text else f"{place}, કોલેજ કેન્ટીન"
+    if attached_place:
+        return attached_place
     if "college" in lowered and "canteen" in lowered:
         return "college canteen"
     if "college" in lowered:

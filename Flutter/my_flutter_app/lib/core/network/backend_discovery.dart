@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'api_config.dart';
 
 /// Finds the EmergencyIQ FastAPI backend without hard-coded PC IPs.
 ///
@@ -15,16 +17,20 @@ class BackendDiscovery {
 
   static const cacheKey = 'emergencyiq_api_base_url';
   static const port = 8000;
-  static const configuredBackend = 'http://192.168.2.200:8000';
-  static const emulatorBackend = 'http://10.0.2.2:8000';
-  static const adbReverseBackend = 'http://127.0.0.1:8000';
-  static const healthPath = '/api/v1/health';
+  static const configuredBackend = ApiConfig.defaultBaseUrl;
+  static const emulatorBackend = ApiConfig.androidEmulatorBaseUrl;
+  static const adbReverseBackend = ApiConfig.adbReverseBaseUrl;
+  static const healthPath = ApiConfig.healthEndpoint;
   static const connectTimeout = Duration(milliseconds: 900);
   static const scanBatchSize = 24;
 
   final http.Client _client;
   Future<String>? _resolveFuture;
   static String? resolved;
+
+  void _log(String message) {
+    if (kDebugMode) debugPrint('[Backend] $message');
+  }
 
   static Future<String> resolveBaseUrl({http.Client? client}) {
     return BackendDiscovery(client: client).ensureResolved();
@@ -34,7 +40,6 @@ class BackendDiscovery {
     return [
       adbReverseBackend,
       emulatorBackend,
-      configuredBackend,
     ];
   }
 
@@ -66,14 +71,14 @@ class BackendDiscovery {
   Future<String> _resolve() async {
     if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
       resolved = adbReverseBackend;
-      debugPrint('[Backend] FLUTTER_TEST resolved to $resolved');
+      _log('FLUTTER_TEST resolved to $resolved');
       return resolved!;
     }
 
-    const fromEnv = String.fromEnvironment('API_BASE_URL');
+    const fromEnv = ApiConfig.baseUrlOverride;
     if (fromEnv.isNotEmpty) {
       resolved = normalizeBaseUrl(fromEnv);
-      debugPrint('[Backend] API_BASE_URL override: $resolved');
+      _log('Using API_BASE_URL override.');
       return resolved!;
     }
 
@@ -83,7 +88,7 @@ class BackendDiscovery {
       final normalized = normalizeBaseUrl(cached);
       if (await _isHealthy(normalized)) {
         resolved = normalized;
-        debugPrint('[Backend] Cache hit: $resolved');
+        _log('Using healthy cached backend.');
         return resolved!;
       }
     }
@@ -97,7 +102,7 @@ class BackendDiscovery {
     if (selected != null) {
       await _remember(prefs, selected);
       resolved = selected;
-      debugPrint('[Backend] Selected backend URL: $resolved');
+      _log('Selected a healthy backend.');
       return resolved!;
     }
 
@@ -105,15 +110,15 @@ class BackendDiscovery {
       final subnetHit = await _discoverOnWifiSubnet(prefs);
       if (subnetHit != null) {
         resolved = subnetHit;
-        debugPrint('[Backend] Selected backend from Wi-Fi scan: $resolved');
+        _log('Selected a backend from Wi-Fi discovery.');
         return resolved!;
       }
     }
 
     resolved = configuredBackend;
-    debugPrint(
-      '[Backend] No healthy backend found; fallback to $resolved '
-      '(physical Android should use the LAN PC IP, unless ADB reverse is configured)',
+    _log(
+      'No healthy backend found; using the configured default. '
+      'Physical Android can use API_BASE_URL or automatic Wi-Fi discovery.',
     );
     return resolved!;
   }
@@ -129,7 +134,7 @@ class BackendDiscovery {
       if (parts.length != 4) return null;
 
       final prefix = '${parts[0]}.${parts[1]}.${parts[2]}';
-      debugPrint('[EmergencyIQ] Scanning Wi-Fi subnet $prefix.0/24 for backend');
+      _log('Scanning the connected Wi-Fi subnet for the backend.');
 
       final hosts = prioritizedHosts();
       for (var start = 0; start < hosts.length; start += scanBatchSize) {
@@ -144,13 +149,13 @@ class BackendDiscovery {
         for (final hit in hits) {
           if (hit != null) {
             await _remember(prefs, hit);
-            debugPrint('[EmergencyIQ] Backend discovered on Wi-Fi: $resolved');
+            _log('Backend discovered on Wi-Fi.');
             return resolved;
           }
         }
       }
     } catch (error) {
-      debugPrint('[EmergencyIQ] Wi-Fi discovery skipped: $error');
+      _log('Wi-Fi discovery skipped (${error.runtimeType}).');
     }
     return null;
   }
@@ -163,7 +168,7 @@ class BackendDiscovery {
   Future<bool> _isHealthy(String baseUrl) async {
     final normalized = normalizeBaseUrl(baseUrl);
     final uri = Uri.parse('$normalized$healthPath');
-    debugPrint('[Health] Probing URL: $uri');
+    _log('Checking backend health.');
 
     try {
       final response = await _client
@@ -172,12 +177,10 @@ class BackendDiscovery {
       final isOk = response.statusCode == 200 &&
           response.body.contains('"status"') &&
           response.body.contains('ok');
-      debugPrint(
-        '[Health] ${isOk ? 'PASS' : 'FAIL'} ${uri.toString()} status=${response.statusCode}',
-      );
+      _log('Health check ${isOk ? 'passed' : 'failed'} (HTTP ${response.statusCode}).');
       return isOk;
     } catch (error) {
-      debugPrint('[Health] FAIL $uri error=${error.runtimeType}: $error');
+      _log('Health check failed (${error.runtimeType}).');
       return false;
     }
   }

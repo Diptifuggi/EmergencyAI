@@ -7,72 +7,21 @@ import ErrorMessage from '@/components/common/ErrorMessage'
 import Card from '@/components/common/Card'
 
 export default function UsersAdmin(){
-  // const { data, isLoading, error } = useQuery({ queryKey: ['users'], queryFn: () => listUsers() })
-  // TODO: Replace with backend API
-  const users = [
-    {
-      id: 'USR-001',
-      full_name: 'Admin User',
-      email: 'admin@emergencyiq.in',
-      role: 'Administrator',
-      status: 'Active',
-      phone: '+91 9876543210',
-      department: 'System Administration',
-      last_login: '5 min ago',
-    },
-    {
-      id: 'USR-002',
-      full_name: 'Rahul Sharma',
-      email: 'rahul@emergencyiq.in',
-      role: 'Dispatcher',
-      status: 'Active',
-      phone: '+91 9876500001',
-      department: 'Police Control Room',
-      last_login: '12 min ago',
-    },
-    {
-      id: 'USR-003',
-      full_name: 'Priya Patel',
-      email: 'priya@emergencyiq.in',
-      role: 'Medical Operator',
-      status: 'Active',
-      phone: '+91 9876500002',
-      department: 'Health Department',
-      last_login: '30 min ago',
-    },
-    {
-      id: 'USR-004',
-      full_name: 'Amit Verma',
-      email: 'amit@emergencyiq.in',
-      role: 'Fire Dispatcher',
-      status: 'Offline',
-      phone: '+91 9876500003',
-      department: 'Fire Brigade',
-      last_login: '1 hour ago',
-    },
-    {
-      id: 'USR-005',
-      full_name: 'Sneha Joshi',
-      email: 'sneha@emergencyiq.in',
-      role: 'Women Safety',
-      status: 'Active',
-      phone: '+91 9876500004',
-      department: 'Women Helpline',
-      last_login: '2 hours ago',
-    },
-    {
-      id: 'USR-006',
-      full_name: 'Rohan Mehta',
-      email: 'rohan@emergencyiq.in',
-      role: 'Cyber Cell',
-      status: 'Busy',
-      phone: '+91 9876500005',
-      department: 'Cyber Crime',
-      last_login: 'Just now',
-    },
-  ]
-  const isLoading = false
-  const error = null
+  const { data: responseUsers = [], isLoading, error } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => listUsers(),
+    refetchInterval: 30000,
+  })
+  const users = responseUsers.map(user => ({
+    id: user.id,
+    full_name: user.username || 'Not available',
+    email: user.email || 'Not available',
+    role: user.role_name || 'Not available',
+    status: user.is_active ? 'Active' : 'Inactive',
+    phone: 'Not available',
+    department: 'Not available',
+    last_login: 'Not available',
+  }))
   if (isLoading) return <Loading />
   if (error) return <ErrorMessage error={error} />
   return (

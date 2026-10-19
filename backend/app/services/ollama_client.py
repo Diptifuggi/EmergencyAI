@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import httpx
 
 from ..core.config import settings
@@ -53,15 +55,25 @@ class OllamaClient:
             self.model,
             self.timeout,
         )
+        started_at = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
         except httpx.TimeoutException as exc:
-            logger.warning("Ollama request timed out after %.0fs", self.timeout)
+            logger.warning(
+                "Ollama request timed out after %.0fs elapsed_ms=%.1f error_type=%s",
+                self.timeout,
+                (time.perf_counter() - started_at) * 1000,
+                type(exc).__name__,
+            )
             raise OllamaUnavailableError("Ollama request timed out") from exc
         except httpx.HTTPError as exc:
-            logger.warning("Ollama HTTP error: %s", exc)
+            logger.warning(
+                "Ollama HTTP error_type=%s elapsed_ms=%.1f",
+                type(exc).__name__,
+                (time.perf_counter() - started_at) * 1000,
+            )
             raise OllamaUnavailableError("Ollama backend is unavailable") from exc
 
         try:
@@ -76,9 +88,10 @@ class OllamaClient:
             raise OllamaUnavailableError("Ollama returned empty analysis content")
 
         logger.info(
-            "Ollama model response received http_status=%d content_length=%d",
+            "Ollama model response received http_status=%d content_length=%d elapsed_ms=%.1f",
             response.status_code,
             len(content),
+            (time.perf_counter() - started_at) * 1000,
         )
         return content.strip()
 

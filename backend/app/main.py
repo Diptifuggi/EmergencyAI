@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 import time
+import re
 
 from .core.config import settings
 from .core.logger import get_logger
@@ -11,6 +12,58 @@ from .api.v1 import router as api_v1
 
 logger = get_logger("app.main")
 
+
+class RequestTimingMiddleware:
+    """Log request timing at response delivery without logging request contents."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        started_at = time.perf_counter()
+        method = scope.get("method", "?")
+        path = scope.get("path", "?")
+        endpoint = re.sub(r"/[0-9a-fA-F-]{36}(?=/|$)", "/{id}", path)
+        logger.info("HTTP request start method=%s endpoint=%s", method, endpoint)
+        status_code = 500
+        response_logged = False
+
+        async def timed_send(message):
+            nonlocal status_code, response_logged
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
+            if (
+                message["type"] == "http.response.body"
+                and not message.get("more_body", False)
+                and not response_logged
+            ):
+                response_logged = True
+                logger.info(
+                    "HTTP response method=%s endpoint=%s status=%d elapsed_ms=%.1f",
+                    method,
+                    endpoint,
+                    status_code,
+                    (time.perf_counter() - started_at) * 1000,
+                )
+
+        try:
+            await self.app(scope, receive, timed_send)
+        except Exception as exc:
+            if not response_logged:
+                logger.error(
+                    "HTTP request failed method=%s endpoint=%s error_type=%s elapsed_ms=%.1f",
+                    method,
+                    endpoint,
+                    type(exc).__name__,
+                    (time.perf_counter() - started_at) * 1000,
+                )
+            raise
+
 app = FastAPI(
     title="EmergencyIQ API",
     version="1.0.0",
@@ -19,6 +72,7 @@ app = FastAPI(
         "Versioned under /api/v1 — additive fields are safe; clients should ignore unknown keys."
     ),
 )
+app.add_middleware(RequestTimingMiddleware)
 
 register_exception_handlers(app)
 

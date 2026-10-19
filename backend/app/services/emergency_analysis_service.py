@@ -200,10 +200,6 @@ class EmergencyAnalysisService:
                 "Emergency analysis model response received content_length=%d",
                 len(raw_content),
             )
-            logger.info(
-                "Emergency analysis raw model response (truncated): %s",
-                raw_content[:2000],
-            )
         except OllamaUnavailableError as exc:
             logger.exception("Ollama unavailable during analysis: %s", exc.message)
             fallback = self._rules_only_fallback(transcript, language)
@@ -304,16 +300,20 @@ class EmergencyAnalysisService:
             validated_fire = facts.fire_present
             validated_medical = facts.medical_emergency
             dispatch_units = recommended_units_for_help(help_required)
-            priority_score = calculate_priority_score(
-                emergency_type=emergency_type,
-                immediate_threat=facts.immediate_danger,
-                # Do not use an LLM-invented count as a dispatch multiplier.
-                # A future extractor may populate this only from explicit text.
-                people_at_risk=0,
-                transcript=transcript,
-                language=language,
-                victim_count=facts.victim_count,
-                caller_request=facts.caller_request is not None,
+            priority_score = (
+                calculate_priority_score(
+                    emergency_type=emergency_type,
+                    immediate_threat=facts.immediate_danger,
+                    # Do not use an LLM-invented count as a dispatch multiplier.
+                    # A future extractor may populate this only from explicit text.
+                    people_at_risk=0,
+                    transcript=transcript,
+                    language=language,
+                    victim_count=facts.victim_count,
+                    caller_request=facts.caller_request is not None,
+                )
+                if facts.current_emergency
+                else 0
             )
             priority_level = level_for_score(priority_score)
             # No calibrated model probability is available. Keep this
@@ -392,6 +392,9 @@ class EmergencyAnalysisService:
                 children_involved=facts.children_involved,
                 cyber_crime=facts.cyber_crime,
                 lpg_leak=facts.lpg_leak,
+                heavy_rain=facts.heavy_rain,
+                flood_risk=facts.flood_risk,
+                flood_confirmed=facts.flood_confirmed,
                 location_description=facts.location_description,
                 caller_request=facts.caller_request,
                 recommended_units=dispatch_units,

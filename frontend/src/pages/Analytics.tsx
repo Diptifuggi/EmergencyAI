@@ -21,37 +21,15 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend)
 
 export default function Analytics() {
-  const MOCK_ANALYTICS = {
-    calls_per_category: {
-      labels: ['Road Accident', 'Medical', 'Fire', 'Women Safety', 'Child Abuse', 'Cyber Crime', 'Natural Disaster', 'Other'],
-      data: [38, 29, 18, 12, 8, 6, 11, 5],
-    },
-    daily_trends: {
-      labels: ['Jun 20', 'Jun 21', 'Jun 22', 'Jun 23', 'Jun 24', 'Jun 25', 'Jun 26'],
-      data: [32, 28, 45, 38, 52, 41, 47],
-    },
-    priority_distribution: {
-      labels: ['Critical', 'Very High', 'High', 'Moderate', 'Low'],
-      data: [18, 32, 49, 71, 100],
-      colors: ['#dc2626', '#f97316', '#f59e0b', '#16a34a', '#3b82f6'],
-    },
-    monthly_summary: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-      datasets: [
-        { label: 'Road Accident', data: [22, 19, 28, 31, 25, 38], color: '#111111' },
-        { label: 'Medical', data: [18, 21, 24, 19, 27, 29], color: '#444444' },
-        { label: 'Fire', data: [8, 11, 9, 14, 12, 18], color: '#777777' },
-        { label: 'Other', data: [12, 9, 15, 11, 18, 14], color: '#aaaaaa' },
-      ],
-    },
-  }
+  const { data: analyticsData, isLoading, error } = useQuery({
+    queryKey: ['emergency-analytics-summary'],
+    queryFn: getAnalytics,
+    refetchInterval: 30000,
+    staleTime: 20000,
+  })
 
-  // TODO: Replace with real API when backend is ready
-  // const { data, isLoading, error } = useQuery({ queryKey: ['analytics'], queryFn: getAnalytics })
-  void useQuery
-  const analyticsData = MOCK_ANALYTICS
-  const isLoading = false
-  const error = null
+  if (isLoading) return <Loading />
+  if (error) return <ErrorMessage error={error} />
 
   const categoryChartData = {
     labels: analyticsData.calls_per_category.labels,

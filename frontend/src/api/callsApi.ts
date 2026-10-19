@@ -2,19 +2,18 @@
 import axiosClient from '@/api/axiosClient'
 import { type AxiosProgressEvent } from 'axios'
 import { EmergencyCall } from '@/types/call'
+import { getEmergencies, getEmergency } from '@/api/emergencyApi'
 
 export async function listCalls(params: Record<string, any> = {}): Promise<EmergencyCall[]> {
-  const resp = await axiosClient.get<EmergencyCall[]>('/calls', { params })
-  return resp.data
+  return getEmergencies(params) as unknown as EmergencyCall[]
 }
 
 export async function getCall(id: string): Promise<EmergencyCall> {
-  const resp = await axiosClient.get<EmergencyCall>(`/calls/${id}`)
-  return resp.data
+  return getEmergency(id) as unknown as Promise<EmergencyCall>
 }
 
 export async function createCall(data: Partial<EmergencyCall>): Promise<EmergencyCall> {
-  const resp = await axiosClient.post<EmergencyCall>('/calls', data)
+  const resp = await axiosClient.post<EmergencyCall>('/emergency-calls/manual', data)
   return resp.data
 }
 
@@ -28,10 +27,14 @@ export async function deleteCall(id: string): Promise<any> {
   return resp.data
 }
 
-export async function uploadAudio(callId: string, file: File, onUploadProgress?: (progressEvent: AxiosProgressEvent) => void): Promise<any> {
+export async function uploadAudio(callId: string, file: File, onUploadProgress?: (progressEvent: AxiosProgressEvent) => void, signal?: AbortSignal): Promise<any> {
   const form = new FormData()
   form.append('file', file)
-  const resp = await axiosClient.post(`/uploads/audio/${callId}`, form, {
+  form.append('language', 'auto')
+  form.append('source', 'react_operator')
+  form.append('existing_call_id', callId)
+  const resp = await axiosClient.post('/emergency-calls/audio', form, {
+    signal,
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress,
   })
@@ -39,13 +42,11 @@ export async function uploadAudio(callId: string, file: File, onUploadProgress?:
 }
 
 export async function getPipelineStatus(callId: string): Promise<any> {
-  const resp = await axiosClient.get(`/uploads/status/${callId}`)
-  return resp.data
+  throw new Error('Pipeline status is not exposed by the current backend.')
 }
 
 export async function runPipeline(callId: string): Promise<any> {
-  const resp = await axiosClient.post(`/pipeline/run/${callId}`)
-  return resp.data
+  throw new Error('Pipeline execution is triggered by emergency call creation.')
 }
 
 export default {

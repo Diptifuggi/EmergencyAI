@@ -14,12 +14,11 @@ void main() {
       );
     });
 
-    test('candidateBackends prefers adb reverse, then emulator, then physical LAN fallback', () {
+    test('candidateBackends prefers adb reverse then Android emulator host', () {
       final candidates = BackendDiscovery.candidateBackends();
       expect(candidates, [
         'http://127.0.0.1:8000',
         'http://10.0.2.2:8000',
-        'http://192.168.2.200:8000',
       ]);
     });
 
@@ -28,7 +27,6 @@ void main() {
         candidates: [
           'http://127.0.0.1:8000',
           'http://10.0.2.2:8000',
-          'http://192.168.2.200:8000',
         ],
         probe: (candidate) async => candidate == 'http://10.0.2.2:8000',
       );
@@ -41,7 +39,6 @@ void main() {
         candidates: [
           'http://127.0.0.1:8000',
           'http://10.0.2.2:8000',
-          'http://192.168.2.200:8000',
         ],
         probe: (_) async => false,
       );

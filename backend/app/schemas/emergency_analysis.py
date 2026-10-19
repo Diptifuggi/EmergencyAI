@@ -150,6 +150,9 @@ class EmergencyAnalysis(BaseModel):
     children_involved: bool = False
     cyber_crime: bool = False
     lpg_leak: bool = False
+    heavy_rain: bool = False
+    flood_risk: bool = False
+    flood_confirmed: bool = False
     location_description: str | None = None
     incident_description: str = ""
     caller_request: str | None = None

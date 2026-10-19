@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -47,6 +48,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   String? _statusMessage;
   String? _backendUrl;
   bool _isDiscoveringBackend = false;
+  String? _pendingTextSubmissionKey;
+  String? _pendingVoiceSubmissionKey;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   EmergencyLocation? _currentLocation;
   EmergencyCall? _lastSavedCall;
@@ -57,17 +60,31 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   @override
   void initState() {
     super.initState();
+    _textController.addListener(_invalidateSubmissionKeys);
     _initBackendConnection();
   }
 
   @override
   void dispose() {
     _connectivitySub?.cancel();
+    _textController.removeListener(_invalidateSubmissionKeys);
     _textController.dispose();
     _longitudeController.dispose();
     _latitudeController.dispose();
     _record.dispose();
     super.dispose();
+  }
+
+  void _invalidateSubmissionKeys() {
+    _pendingTextSubmissionKey = null;
+    _pendingVoiceSubmissionKey = null;
+  }
+
+  String _newIdempotencyKey() {
+    final random = Random.secure();
+    return List<int>.generate(16, (_) => random.nextInt(256))
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
   }
 
   Future<void> _initBackendConnection() async {
@@ -251,6 +268,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     }
 
     final tempDir = await getTemporaryDirectory();
+    _pendingVoiceSubmissionKey = null;
     final fileName = 'emergency_${DateTime.now().millisecondsSinceEpoch}.m4a';
     final filePath = path.join(tempDir.path, fileName);
 
@@ -263,8 +281,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       path: filePath,
     );
 
-    debugPrint(
-        '[EmergencyIQ] Recording started path=$filePath format=m4a mime=audio/mp4');
+    debugPrint('[EmergencyIQ] Recording started format=m4a mime=audio/mp4');
 
     setState(() {
       _isRecording = true;
@@ -282,8 +299,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     final size =
         resolvedPath == null || !exists ? 0 : await File(resolvedPath).length();
     debugPrint(
-      '[EmergencyIQ] Recording stopped path=$resolvedPath exists=$exists '
-      'sizeBytes=$size extension=${resolvedPath == null ? 'unknown' : path.extension(resolvedPath)}',
+      '[EmergencyIQ] Recording stopped exists=$exists sizeBytes=$size '
+      'extension=${resolvedPath == null ? 'unknown' : path.extension(resolvedPath)}',
     );
     setState(() {
       _isRecording = false;
@@ -317,9 +334,12 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     setState(() => _isSubmitting = true);
     try {
       final location = await _locationForSubmission();
+      final idempotencyKey =
+          _pendingTextSubmissionKey ??= _newIdempotencyKey();
       final call = await EmergencyApiService().submitTextEmergency(
         text: text,
         language: language!,
+        idempotencyKey: idempotencyKey,
         latitude:
             location?.latitude ?? _parseCoordinate(_latitudeController.text),
         longitude:
@@ -372,10 +392,9 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     }
     final audioBytes = await file.readAsBytes();
     debugPrint(
-      '[EmergencyIQ] Upload preparation path=${file.path} exists=true '
-      'sizeBytes=$fileSize bytesRead=${audioBytes.length} '
+      '[EmergencyIQ] Upload preparation sizeBytes=$fileSize '
+      'bytesRead=${audioBytes.length} '
       'extension=${path.extension(file.path)} mime=audio/mp4 multipartField=file '
-      'filename=${path.basename(file.path)}',
     );
 
     var transcription = _textController.text.trim();
@@ -439,10 +458,13 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       final location = await _locationForSubmission();
       final service = EmergencyApiService();
       if (transcription.isNotEmpty) {
+        final idempotencyKey =
+            _pendingVoiceSubmissionKey ??= _newIdempotencyKey();
         final call = await service.submitVoiceAndText(
           audioFile: file,
           transcription: transcription,
           language: submissionLanguage!,
+          idempotencyKey: idempotencyKey,
           latitude:
               location?.latitude ?? _parseCoordinate(_latitudeController.text),
           longitude: location?.longitude ??
@@ -464,9 +486,12 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         _showMessage(_formatSavedCall(call));
         _textController.clear();
       } else {
+        final idempotencyKey =
+            _pendingVoiceSubmissionKey ??= _newIdempotencyKey();
         final call = await service.submitAudioEmergency(
           audioFile: file,
           language: submissionLanguage!,
+          idempotencyKey: idempotencyKey,
           latitude:
               location?.latitude ?? _parseCoordinate(_latitudeController.text),
           longitude: location?.longitude ??
@@ -494,7 +519,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         _transcriptionMetadata = null;
       });
     } catch (error) {
-      _showMessage('Unable to submit emergency. Please try again or enter the message manually.');
+      _showMessage(_friendlyError(error));
     } finally {
       setState(() => _isSubmitting = false);
     }
@@ -513,7 +538,10 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   }
 
   String _friendlyError(Object error) {
-    if (error is SocketException || error is TimeoutException) {
+    if (error is TimeoutException) {
+      return 'Backend request timed out. Please try again.';
+    }
+    if (error is SocketException) {
       return 'Unable to connect to the EmergencyIQ server.';
     }
     final message = error.toString().replaceFirst('Exception: ', '').trim();

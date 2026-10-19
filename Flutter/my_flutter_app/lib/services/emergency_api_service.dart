@@ -1,15 +1,118 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:http/http.dart' as http;
 
 import '../core/language/language_mapper.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_config.dart';
 import '../models/emergency_call.dart';
 
 class EmergencyApiService {
+  Uri _endpoint(String baseUrl, String path) => Uri.parse('$baseUrl$path');
+  String _safePath(Uri uri) =>
+      uri.path.replaceAll(RegExp(r'/[0-9a-fA-F-]{36}(?=/|$)'), '/{id}');
+
+  void _log(String message) {
+    if (kDebugMode) debugPrint('[API] $message');
+  }
+
+  Future<http.Response> _request(
+    Future<http.Response> request, {
+    required String method,
+    required Uri uri,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    final endpoint = _safePath(uri);
+    _log('$method $endpoint request start');
+    try {
+      final response = await request.timeout(ApiConfig.requestTimeout);
+      _log(
+        '$method $endpoint response status=${response.statusCode} '
+        'elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      return response;
+    } on TimeoutException catch (error) {
+      _log(
+        '$method $endpoint timeout type=${error.runtimeType} '
+        'elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      throw ApiException('Backend request timed out. Please try again.');
+    } on SocketException catch (error) {
+      _log(
+        '$method $endpoint connection failure type=${error.runtimeType} '
+        'elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      throw ApiException('Cannot connect to EmergencyIQ backend.');
+    } on http.ClientException catch (error) {
+      _log(
+        '$method $endpoint client failure type=${error.runtimeType} '
+        'elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      throw ApiException('Cannot connect to EmergencyIQ backend.');
+    }
+  }
+
+  Future<http.Response> _sendMultipart(http.MultipartRequest request) async {
+    final endpoint = _safePath(request.url);
+    final stopwatch = Stopwatch()..start();
+    var phase = 'send/upload/response-headers';
+    _log('${request.method} $endpoint multipart request start');
+    try {
+      final streamed = await request.send().timeout(ApiConfig.uploadTimeout);
+      phase = 'response-body';
+      final response = await http.Response.fromStream(streamed)
+          .timeout(ApiConfig.uploadTimeout);
+      _log(
+        '${request.method} $endpoint response status=${response.statusCode} '
+        'elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      return response;
+    } on TimeoutException catch (error) {
+      _log(
+        '${request.method} $endpoint timeout phase=$phase '
+        'type=${error.runtimeType} elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      throw ApiException('Backend request timed out. Please try again.');
+    } on SocketException catch (error) {
+      _log(
+        '${request.method} $endpoint connection failure phase=$phase '
+        'type=${error.runtimeType} elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      throw ApiException('Cannot connect to EmergencyIQ backend.');
+    } on http.ClientException catch (error) {
+      _log(
+        '${request.method} $endpoint client failure phase=$phase '
+        'type=${error.runtimeType} elapsed_ms=${stopwatch.elapsedMilliseconds}',
+      );
+      throw ApiException('Cannot connect to EmergencyIQ backend.');
+    }
+  }
+
+  Future<Map<String, dynamic>> healthCheck() async {
+    final baseUrl = await ApiClient.getBaseUrl();
+    final uri = _endpoint(baseUrl, ApiConfig.healthEndpoint);
+    final response = await _request(
+      ApiClient.client.get(uri, headers: {'Accept': 'application/json'}),
+      method: 'GET',
+      uri: uri,
+    );
+    if (response.statusCode != 200) {
+      throw ApiException(_backendError(
+        response,
+        'EmergencyIQ backend health check failed.',
+      ));
+    }
+    final body = jsonDecode(response.body);
+    if (body is! Map<String, dynamic>) {
+      throw ApiException('EmergencyIQ backend returned an invalid health response.');
+    }
+    return body;
+  }
+
   Future<void> _addMapSnapshot(
     http.MultipartRequest request,
     Uint8List? bytes,
@@ -30,14 +133,17 @@ class EmergencyApiService {
     final baseUrl = await ApiClient.getBaseUrl();
     final request = http.MultipartRequest(
       'POST',
-      Uri.parse('$baseUrl/api/v1/emergency-calls/$callId/map-snapshot'),
+      _endpoint(
+        baseUrl,
+        ApiConfig.mapSnapshotEndpoint.replaceAll('{callId}', callId),
+      ),
     )..files.add(http.MultipartFile.fromBytes(
         'map_snapshot',
         bytes,
         filename: 'map_snapshot.png',
         contentType: http.MediaType('image', 'png'),
       ));
-    final response = await http.Response.fromStream(await request.send());
+    final response = await _sendMultipart(request);
     if (response.statusCode != 200) {
       throw ApiException(
         _backendError(response, 'Unable to upload the map snapshot.'),
@@ -64,8 +170,7 @@ class EmergencyApiService {
     Uint8List? audioBytes,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
-    final uri = Uri.parse('$baseUrl/api/v1/stt/transcribe');
-    final exists = await audioFile.exists();
+    final uri = _endpoint(baseUrl, ApiConfig.sttEndpoint);
     final request = http.MultipartRequest(
       'POST',
       uri,
@@ -80,15 +185,9 @@ class EmergencyApiService {
       filename: audioFile.path.split(Platform.pathSeparator).last,
       contentType: _audioMediaType(audioFile.path),
     ));
-    debugPrint(
-      '[STT] Starting upload file=${audioFile.path.split(Platform.pathSeparator).last} '
-      'exists=$exists sizeBytes=${payload.length} language=${request.fields['language_code']} '
-      'url=$uri contentType=${_audioMediaType(audioFile.path)} multipartField=file',
-    );
-    debugPrint('[LANG] Sarvam language_code=${request.fields['language_code']}');
-    final response = await http.Response.fromStream(await request.send());
-    debugPrint('[STT] HTTP Status: ${response.statusCode}');
-    debugPrint('[STT] Response: ${response.body}');
+    _log('POST ${ApiConfig.sttEndpoint}');
+    final response = await _sendMultipart(request);
+    _log('Status: ${response.statusCode}');
     if (response.statusCode != 200) {
       throw ApiException(_backendError(response, 'Unable to transcribe audio. Please try again.'));
     }
@@ -97,7 +196,7 @@ class EmergencyApiService {
     if (result.transcript.trim().isEmpty) {
       throw ApiException('No speech was detected. Please record a clearer message.');
     }
-    debugPrint('[LANG] detected language=${result.language ?? 'unknown'}');
+    _log('Transcription completed.');
     return result;
   }
 
@@ -120,19 +219,46 @@ class EmergencyApiService {
   }
 
   String _backendError(http.Response response, String fallback) {
+    if (response.statusCode == 401) {
+      return 'Authentication is required to contact the EmergencyIQ backend.';
+    }
+    if (response.statusCode == 403) {
+      return 'You do not have permission to perform this request.';
+    }
+    if (response.statusCode == 404) {
+      return 'The requested EmergencyIQ endpoint was not found.';
+    }
+    if (response.statusCode >= 500) {
+      return 'EmergencyIQ backend is unavailable. Please try again later.';
+    }
+
     try {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       final detail = body['detail'];
       if (detail is String && detail.trim().isNotEmpty) return detail;
+      if (detail is List) {
+        final messages = detail.whereType<Map>().map((item) {
+          final location = item['loc'];
+          final field = location is List && location.isNotEmpty
+              ? location.skip(1).join('.')
+              : 'request';
+          final message = item['msg']?.toString();
+          return message == null || message.isEmpty ? null : '$field: $message';
+        }).whereType<String>().toList();
+        if (messages.isNotEmpty) return 'Invalid request: ${messages.join('; ')}';
+      }
     } catch (_) {
-      // Keep server internals out of the user-facing message.
+      // Keep server internals and malformed responses out of the UI.
     }
+    if (response.statusCode == 400) return 'The request is invalid. Please review it and try again.';
+    if (response.statusCode == 422) return 'Some submitted information is invalid. Please review it and try again.';
     return fallback;
   }
 
   Future<EmergencyCall> submitTextEmergency({
     required String text,
     required String language,
+    required String idempotencyKey,
     double? latitude,
     double? longitude,
     double? locationAccuracy,
@@ -140,23 +266,28 @@ class EmergencyApiService {
     Map<String, dynamic>? clientMetadata,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
-    debugPrint('[EmergencyIQ] POST $baseUrl/api/v1/emergency-calls/text');
-    final response = await ApiClient.client.post(
-      Uri.parse('$baseUrl/api/v1/emergency-calls/text'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode({
-        'text': text.trim(),
-        'language': _validatedLanguage(language),
-        'latitude': latitude,
-        'longitude': longitude,
-        'location_accuracy': locationAccuracy,
-        'location_timestamp': locationTimestamp?.toUtc().toIso8601String(),
-        'source': 'flutter',
-        if (clientMetadata != null) 'client_metadata': clientMetadata,
-      }),
+    final uri = _endpoint(baseUrl, ApiConfig.textEmergencyEndpoint);
+    final response = await _request(
+      ApiClient.client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: jsonEncode({
+          'text': text.trim(),
+          'language': _validatedLanguage(language),
+          'latitude': latitude,
+          'longitude': longitude,
+          'location_accuracy': locationAccuracy,
+          'location_timestamp': locationTimestamp?.toUtc().toIso8601String(),
+          'source': 'flutter',
+          if (clientMetadata != null) 'client_metadata': clientMetadata,
+        }),
+      ),
+      method: 'POST',
+      uri: uri,
     );
 
     if (response.statusCode != 201) {
@@ -169,10 +300,7 @@ class EmergencyApiService {
     final call = EmergencyCall.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
-    debugPrint(
-      '[EmergencyIQ] Saved text emergency id=${call.id} '
-      'lat=${call.latitude} long=${call.longitude} status=${call.status}',
-    );
+    _log('Status: ${response.statusCode}; emergency id=${call.id}');
     return call;
   }
 
@@ -181,6 +309,7 @@ class EmergencyApiService {
     required File audioFile,
     required String transcription,
     required String language,
+    required String idempotencyKey,
     double? latitude,
     double? longitude,
     double? locationAccuracy,
@@ -190,12 +319,13 @@ class EmergencyApiService {
     Uint8List? audioBytes,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
-    final uri = Uri.parse('$baseUrl/api/v1/emergency-calls/voice-text');
-    debugPrint('[EmergencyIQ] POST $uri');
+    final uri = _endpoint(baseUrl, ApiConfig.voiceTextEmergencyEndpoint);
+    _log('POST ${ApiConfig.voiceTextEmergencyEndpoint}');
     final request = http.MultipartRequest('POST', uri)
       ..fields['language'] = _validatedLanguage(language)
       ..fields['transcription'] = transcription.trim()
-      ..fields['source'] = 'flutter';
+      ..fields['source'] = 'flutter'
+      ..headers['Idempotency-Key'] = idempotencyKey;
     await _addMapSnapshot(request, mapSnapshot);
 
     if (latitude != null) {
@@ -216,10 +346,6 @@ class EmergencyApiService {
     }
 
     final payload = audioBytes ?? await audioFile.readAsBytes();
-    debugPrint(
-      '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} '
-      'bytesSent=${payload.length} contentType=${_audioMediaType(audioFile.path)}',
-    );
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
@@ -229,10 +355,8 @@ class EmergencyApiService {
       ),
     );
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-    debugPrint(
-        '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} responseStatus=${response.statusCode}');
+    final response = await _sendMultipart(request);
+    _log('Status: ${response.statusCode}');
 
     if (response.statusCode != 201) {
       throw ApiException(_backendError(
@@ -244,10 +368,7 @@ class EmergencyApiService {
     final call = EmergencyCall.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
-    debugPrint(
-      '[EmergencyIQ] Saved voice+text emergency id=${call.id} '
-      'lat=${call.latitude} long=${call.longitude} status=${call.status}',
-    );
+    _log('Voice+text emergency saved; id=${call.id}');
     return call;
   }
 
@@ -255,6 +376,7 @@ class EmergencyApiService {
   Future<EmergencyCall> submitAudioEmergency({
     required File audioFile,
     required String language,
+    required String idempotencyKey,
     String? transcription,
     double? latitude,
     double? longitude,
@@ -265,10 +387,12 @@ class EmergencyApiService {
     Uint8List? audioBytes,
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
-    final uri = Uri.parse('$baseUrl/api/v1/emergency-calls/audio');
+    final uri = _endpoint(baseUrl, ApiConfig.audioEmergencyEndpoint);
+    _log('POST ${ApiConfig.audioEmergencyEndpoint}');
     final request = http.MultipartRequest('POST', uri)
       ..fields['language'] = _validatedLanguage(language)
-      ..fields['source'] = 'flutter';
+      ..fields['source'] = 'flutter'
+      ..headers['Idempotency-Key'] = idempotencyKey;
     await _addMapSnapshot(request, mapSnapshot);
 
     if (transcription != null && transcription.trim().isNotEmpty) {
@@ -292,10 +416,6 @@ class EmergencyApiService {
     }
 
     final payload = audioBytes ?? await audioFile.readAsBytes();
-    debugPrint(
-      '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} '
-      'bytesSent=${payload.length} contentType=${_audioMediaType(audioFile.path)}',
-    );
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
@@ -305,10 +425,8 @@ class EmergencyApiService {
       ),
     );
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-    debugPrint(
-        '[EmergencyIQ] Multipart field=file filename=${audioFile.path.split(Platform.pathSeparator).last} responseStatus=${response.statusCode}');
+    final response = await _sendMultipart(request);
+    _log('Status: ${response.statusCode}');
 
     if (response.statusCode != 201) {
       throw ApiException(_backendError(
@@ -320,10 +438,7 @@ class EmergencyApiService {
     final call = EmergencyCall.fromJson(
       jsonDecode(response.body) as Map<String, dynamic>,
     );
-    debugPrint(
-      '[EmergencyIQ] Saved audio emergency id=${call.id} '
-      'lat=${call.latitude} long=${call.longitude} status=${call.status}',
-    );
+    _log('Audio emergency saved; id=${call.id}');
     return call;
   }
 
@@ -351,11 +466,12 @@ class EmergencyApiService {
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
     final uri = Uri.parse(
-      '$baseUrl/api/v1/emergency-calls/?limit=$limit&offset=$offset',
+      '$baseUrl${ApiConfig.emergencyCallsEndpoint}/?limit=$limit&offset=$offset',
     );
-    final response = await ApiClient.client.get(
-      uri,
-      headers: {'Accept': 'application/json'},
+    final response = await _request(
+      ApiClient.client.get(uri, headers: {'Accept': 'application/json'}),
+      method: 'GET',
+      uri: uri,
     );
 
     if (response.statusCode != 200) {

@@ -16,6 +16,7 @@ class EmergencyCall(Base):
     __table_args__ = (
         Index("ix_emergency_calls_created_at", "created_at"),
         Index("ix_emergency_calls_status", "status"),
+        Index("uq_emergency_calls_idempotency_key", "idempotency_key", unique=True),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -48,6 +49,7 @@ class EmergencyCall(Base):
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     transcription: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(String(50), nullable=True, default="flutter")
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     client_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)

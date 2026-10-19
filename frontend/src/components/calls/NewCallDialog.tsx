@@ -4,7 +4,7 @@ import { Button, Card, CardHeader, CardTitle, CardContent, Input } from '@/compo
 import callsApi from '@/api/callsApi'
 import FileUploadDropzone from './FileUploadDropzone'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 
 export default function NewCallDialog() {
@@ -12,11 +12,15 @@ export default function NewCallDialog() {
   const [step, setStep] = useState(1)
   const [form, setForm] = useState({ caller_name: '', caller_phone: '', started_at: new Date().toISOString().slice(0,16), latitude: '', longitude: '' })
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const createMutation = useMutation({
     mutationFn: (data) => callsApi.createCall(data),
     onSuccess: (data) => {
       if (data?.id) {
+        queryClient.invalidateQueries({ queryKey: ['emergency-calls'] })
+        queryClient.invalidateQueries({ queryKey: ['emergency-analytics-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['incidents'] })
         setForm(prev => ({ ...prev, id: data.id }))
         setStep(2)
       } else {
@@ -32,8 +36,8 @@ export default function NewCallDialog() {
       caller_name: form.caller_name,
       caller_phone: form.caller_phone,
       started_at: form.started_at,
-      latitude: form.latitude || null,
-      longitude: form.longitude || null,
+      latitude: form.latitude ? parseFloat(form.latitude) : null,
+      longitude: form.longitude ? parseFloat(form.longitude) : null,
     })
   }
 

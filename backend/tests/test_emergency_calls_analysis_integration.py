@@ -11,6 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 from app.schemas.emergency_analysis import (
     STATUS_ANALYSIS_FAILED,
+    STATUS_ANALYZING,
     STATUS_ANALYZED,
     STATUS_PENDING_TRANSCRIPTION,
     AnalysisLevel,
@@ -56,13 +57,16 @@ async def test_create_text_emergency_with_analysis(
 
     assert response.status_code == 201
     data = response.json()
-    assert data["status"] == STATUS_ANALYZED
-    assert data["priority"] == "critical"
+    assert data["status"] == STATUS_ANALYZING
     assert data["text_content"] == payload["text"]
     assert data["call_type"] == "text"
-    assert "emergency_analysis" in data["client_metadata"]
     assert uuid.UUID(data["id"])
     mock_analysis_success.assert_awaited_once()
+    saved = await async_client.get(f"/api/v1/emergency-calls/{data['id']}")
+    assert saved.status_code == 200
+    assert saved.json()["status"] == STATUS_ANALYZED
+    assert saved.json()["priority"] == "critical"
+    assert "emergency_analysis" in saved.json()["client_metadata"]
 
 
 @pytest.mark.asyncio
@@ -111,10 +115,13 @@ async def test_create_voice_and_text_preserves_metadata_and_analyzes(
     assert response.status_code == 201
     body = response.json()
     assert body["call_type"] == "voice_text"
-    assert body["status"] == STATUS_ANALYZED
+    assert body["status"] == STATUS_ANALYZING
     assert body["client_metadata"]["device"] == "test"
-    assert "emergency_analysis" in body["client_metadata"]
     mock_analysis_success.assert_awaited_once()
+    saved = await async_client.get(f"/api/v1/emergency-calls/{body['id']}")
+    assert saved.status_code == 200
+    assert saved.json()["status"] == STATUS_ANALYZED
+    assert "emergency_analysis" in saved.json()["client_metadata"]
 
 
 @pytest.mark.asyncio
@@ -132,13 +139,15 @@ async def test_create_text_emergency_analysis_failure_keeps_call(
     assert response.status_code == 201
     data = response.json()
     assert data["text_content"] == payload["text"]
-    assert data["status"] == STATUS_ANALYSIS_FAILED
-    assert "emergency_analysis_error" in data["client_metadata"]
-    assert data["client_metadata"]["emergency_analysis_error"]["code"] == "ollama_unavailable"
-    assert "emergency_analysis" not in data["client_metadata"]
+    assert data["status"] == STATUS_ANALYZING
 
     get_response = await async_client.get(f"/api/v1/emergency-calls/{data['id']}")
     assert get_response.status_code == 200
+    saved = get_response.json()
+    assert saved["status"] == STATUS_ANALYSIS_FAILED
+    assert "emergency_analysis_error" in saved["client_metadata"]
+    assert saved["client_metadata"]["emergency_analysis_error"]["code"] == "ollama_unavailable"
+    assert "emergency_analysis" not in saved["client_metadata"]
 
 
 @pytest.mark.asyncio
@@ -183,8 +192,11 @@ async def test_create_text_emergency_invalid_ollama_response_failure(
 
     assert response.status_code == 201
     data = response.json()
-    assert data["status"] == STATUS_ANALYSIS_FAILED
-    assert data["client_metadata"]["emergency_analysis_error"]["code"] == "invalid_analysis_response"
+    assert data["status"] == STATUS_ANALYZING
+    saved = await async_client.get(f"/api/v1/emergency-calls/{data['id']}")
+    assert saved.status_code == 200
+    assert saved.json()["status"] == STATUS_ANALYSIS_FAILED
+    assert saved.json()["client_metadata"]["emergency_analysis_error"]["code"] == "invalid_analysis_response"
 
 
 @pytest.mark.asyncio
@@ -278,8 +290,11 @@ async def test_multiple_emergency_scenarios(
 
         assert response.status_code == 201
         body = response.json()
-        assert body["status"] == STATUS_ANALYZED
-        assert "emergency_analysis" in body["client_metadata"]
+        assert body["status"] == STATUS_ANALYZING
+        saved = await async_client.get(f"/api/v1/emergency-calls/{body['id']}")
+        assert saved.status_code == 200
+        assert saved.json()["status"] == STATUS_ANALYZED
+        assert "emergency_analysis" in saved.json()["client_metadata"]
 
 
 @pytest.mark.asyncio
@@ -304,8 +319,11 @@ async def test_live_ollama_police_scenario(async_client: AsyncClient) -> None:
 
     assert response.status_code == 201
     data = response.json()
-    assert data["status"] == STATUS_ANALYZED
-    analysis = data["client_metadata"]["emergency_analysis"]
+    assert data["status"] == STATUS_ANALYZING
+    saved = await async_client.get(f"/api/v1/emergency-calls/{data['id']}")
+    assert saved.status_code == 200
+    assert saved.json()["status"] == STATUS_ANALYZED
+    analysis = saved.json()["client_metadata"]["emergency_analysis"]
     assert analysis["emergency_type"] in {"police", "women_safety", "harassment"}
     assert "police" in analysis["dispatch_recommendation"]["recommended_units"] or any(
         unit == "police" for unit in analysis.get("help_required", [])

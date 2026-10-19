@@ -3,10 +3,11 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Bell, Search, User, CheckCircle, Menu } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { useQuery } from '@tanstack/react-query'
-import { listCalls } from '@/api/callsApi'
+import { getEmergencies } from '@/api/emergencyApi'
 import { getPriorityConfig } from '@/lib/priorityUtils'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { analysisForCall, categoryForCall, priorityForCall, transcriptForCall } from '@/types/emergency'
 
 function useClock(){
   const [now, setNow] = useState(new Date())
@@ -39,8 +40,14 @@ export default function Topbar(){
 
   const title = PATH_TITLES[location.pathname] || 'Emergency Operations'
 
-  const { data: critical } = useQuery({ queryKey: ['calls','critical'], queryFn: () => listCalls({ priority: 'Critical', page_size: 5 }), refetchInterval: 15000, retry: false })
-  const criticalCount = critical?.length || 0
+  const { data: callRecords = [] } = useQuery({
+    queryKey: ['emergency-calls'],
+    queryFn: () => getEmergencies({ limit: 200, offset: 0 }),
+    refetchInterval: 10000,
+    retry: false,
+  })
+  const critical = callRecords.filter((call) => priorityForCall(call) === 'Critical')
+  const criticalCount = critical.length
 
   function handleViewCall(id){ navigate(`/calls/${id}`); setSheetOpen(false) }
 
@@ -83,12 +90,15 @@ export default function Topbar(){
                   ) : (
                     <ul className="space-y-3">
                       {critical.slice(0,5).map(c => {
-                        const cfg = getPriorityConfig(c.priority || 'Critical')
+                        const priority = priorityForCall(c)
+                        const analysis = analysisForCall(c)
+                        const metadata = c.client_metadata || {}
+                        const cfg = getPriorityConfig(priority)
                         return (
                           <li key={c.id} className="flex items-center justify-between">
                             <div>
-                              <div className="font-medium">{c.caller_name || c.caller || 'Unknown'}</div>
-                              <div className="text-xs text-gray-500">{c.category || '—'} • Score: {c.score ?? '—'}</div>
+                              <div className="font-medium">{metadata.caller_name || 'Not available'}</div>
+                              <div className="text-xs text-gray-500">{categoryForCall(c)} • Score: {analysis.priority_score ?? 'Not available'}</div>
                             </div>
                             <div className="flex items-center gap-2">
                               <div className="px-2 py-0.5 text-xs rounded" style={{ background: cfg.color + '20', color: cfg.color }}>{cfg.label}</div>
@@ -142,16 +152,28 @@ export default function Topbar(){
 }
 
 function SearchResults({ q, onView }){
-  const { data } = useQuery({ queryKey: ['search', q], queryFn: () => listCalls({ q, limit: 10 }), enabled: q.length >= 3, retry: false })
-  if (!data) return <div className="text-sm text-gray-500">Searching…</div>
-  if (data.length === 0) return <div className="text-sm text-gray-500">No results</div>
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['emergency-calls'],
+    queryFn: () => getEmergencies({ limit: 200, offset: 0 }),
+    enabled: q.length >= 3,
+    retry: false,
+  })
+  if (error) return <div className="text-sm text-red-600">Unable to search emergency calls.</div>
+  if (isLoading || !data) return <div className="text-sm text-gray-500">Searching…</div>
+  const normalizedQuery = q.toLowerCase()
+  const matches = data.filter((call) => {
+    const metadata = call.client_metadata || {}
+    return [call.id, metadata.caller_name, metadata.caller_phone, categoryForCall(call), transcriptForCall(call)]
+      .some((value) => typeof value === 'string' && value.toLowerCase().includes(normalizedQuery))
+  })
+  if (matches.length === 0) return <div className="text-sm text-gray-500">No results</div>
   return (
     <ul className="space-y-2">
-      {data.map(d => (
+      {matches.slice(0, 10).map(d => (
         <li key={d.id} className="flex items-center justify-between">
           <div>
-            <div className="font-medium">{d.caller_name || d.caller || 'Unknown'}</div>
-            <div className="text-xs text-gray-500">{d.phone_number || d.source || ''}</div>
+            <div className="font-medium">{d.client_metadata?.caller_name || 'Not available'}</div>
+            <div className="text-xs text-gray-500">{d.client_metadata?.caller_phone || d.source || ''}</div>
           </div>
           <div>
             <button onClick={()=> onView(d.id)} className="text-sm text-blue-600">View</button>

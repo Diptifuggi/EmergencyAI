@@ -3,7 +3,7 @@ import axiosClient from '@/api/axiosClient'
 import { User, Role } from '@/types/user'
 
 export async function listUsers(params = {}): Promise<User[]> {
-  const resp = await axiosClient.get<User[]>('/users', { params })
+  const resp = await axiosClient.get<User[]>('/users/', { params })
   return resp.data
 }
 
@@ -18,7 +18,7 @@ export async function updateUser(id: string, data: Partial<User>): Promise<User>
 }
 
 export async function listRoles(): Promise<Role[]> {
-  const resp = await axiosClient.get<Role[]>('/roles')
+  const resp = await axiosClient.get<Role[]>('/users/roles')
   return resp.data
 }
 

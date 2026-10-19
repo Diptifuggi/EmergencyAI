@@ -44,5 +44,8 @@ async def reverse_geocode(latitude: float, longitude: float) -> str | None:
             display_name = payload.get("display_name")
             return display_name.strip() if isinstance(display_name, str) and display_name.strip() else None
     except (httpx.HTTPError, ValueError, TypeError) as exc:
-        logger.warning("Local reverse geocoding unavailable: %s", exc)
+        logger.warning(
+            "Local reverse geocoding unavailable error_type=%s",
+            type(exc).__name__,
+        )
         return None

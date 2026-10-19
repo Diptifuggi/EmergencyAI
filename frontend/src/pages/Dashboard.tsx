@@ -1,4 +1,5 @@
 import React from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -20,114 +21,58 @@ import {
   MapPin,
   ChevronRight,
 } from 'lucide-react'
+import { getEmergencyAnalytics } from '@/api/emergencyApi'
+import Loading from '@/components/common/Loading'
+import ErrorMessage from '@/components/common/ErrorMessage'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
-const MOCK = {
-  total_calls: 1284,
-  critical_calls: 18,
-  dispatched: 65,
-  resolved: 931,
-  average_severity: 61.4,
-  todays_calls: 47,
-  pending: 24,
-  active_incidents: 12,
-  calls_by_status: {
-    Pending: 24,
-    Processing: 18,
-    Assigned: 12,
-    Resolved: 931,
-  },
-  calls_by_category: {
-    'Road Accident': 38,
-    'Medical Emergency': 29,
-    'Fire': 18,
-    'Women Safety': 12,
-    'Other': 9,
-  },
-  call_rate_7days: {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    data: [28, 35, 41, 30, 47, 22, 18],
-  },
-  severity_distribution: [
-    { level: 'Critical', count: 18, color: '#dc2626', width: '18%' },
-    { level: 'Very High', count: 32, color: '#f97316', width: '32%' },
-    { level: 'High', count: 49, color: '#f59e0b', width: '49%' },
-    { level: 'Moderate', count: 71, color: '#16a34a', width: '71%' },
-    { level: 'Low', count: 100, color: '#3b82f6', width: '100%' },
-  ],
-  recent_calls: [
-    {
-      id: 'mock-001',
-      caller_name: 'Ramesh P.',
-      caller_phone: '+91 98765 43210',
-      time_ago: '12m ago',
-      category: 'Road Accident',
-      priority_level: 'Critical',
-      priority_color: 'bg-red-100 text-red-800',
-      dot_color: 'bg-red-600',
-      final_score: 92.4,
-      score_color: '#dc2626',
-      status: 'Processing',
-    },
-    {
-      id: 'mock-002',
-      caller_name: 'Priya S.',
-      caller_phone: '+91 87654 32109',
-      time_ago: '28m ago',
-      category: 'Medical Emergency',
-      priority_level: 'Very High',
-      priority_color: 'bg-orange-100 text-orange-800',
-      dot_color: 'bg-orange-500',
-      final_score: 78.1,
-      score_color: '#f97316',
-      status: 'Assigned',
-    },
-    {
-      id: 'mock-003',
-      caller_name: 'Ankit M.',
-      caller_phone: '+91 76543 21098',
-      time_ago: '45m ago',
-      category: 'Fire',
-      priority_level: 'High',
-      priority_color: 'bg-amber-100 text-amber-800',
-      dot_color: 'bg-amber-500',
-      final_score: 65.7,
-      score_color: '#f59e0b',
-      status: 'Pending',
-    },
-    {
-      id: 'mock-004',
-      caller_name: 'Sunita K.',
-      caller_phone: '+91 65432 10987',
-      time_ago: '1h ago',
-      category: 'Women Safety',
-      priority_level: 'High',
-      priority_color: 'bg-amber-100 text-amber-800',
-      dot_color: 'bg-amber-500',
-      final_score: 59.2,
-      score_color: '#f59e0b',
-      status: 'Processing',
-    },
-    {
-      id: 'mock-005',
-      caller_name: 'Vijay R.',
-      caller_phone: '+91 54321 09876',
-      time_ago: '1h 33m ago',
-      category: 'Natural Disaster',
-      priority_level: 'Moderate',
-      priority_color: 'bg-green-100 text-green-800',
-      dot_color: 'bg-green-600',
-      final_score: 38.5,
-      score_color: '#16a34a',
-      status: 'Resolved',
-    },
-  ],
-}
-
 export default function Dashboard() {
-  const data: any = MOCK
-  const isLoading = false
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['emergency-analytics-summary'],
+    queryFn: getEmergencyAnalytics,
+    refetchInterval: 15000,
+    staleTime: 10000,
+  })
+
+  if (isLoading) return <Loading />
+  if (error) return <ErrorMessage error={error} />
+
+  const formatMetric = (value: number | null | undefined) =>
+    value == null ? '—' : value.toLocaleString()
+  const levelStyles: Record<string, { background: string; foreground: string; dot: string; score: string }> = {
+    Critical: { background: 'bg-red-100 text-red-800', foreground: 'bg-red-600', dot: 'bg-red-600', score: '#dc2626' },
+    High: { background: 'bg-amber-100 text-amber-800', foreground: 'bg-amber-500', dot: 'bg-amber-500', score: '#f59e0b' },
+    Moderate: { background: 'bg-green-100 text-green-800', foreground: 'bg-green-600', dot: 'bg-green-600', score: '#16a34a' },
+    Low: { background: 'bg-blue-100 text-blue-800', foreground: 'bg-blue-500', dot: 'bg-blue-500', score: '#3b82f6' },
+  }
+  const maxSeverityCount = Math.max(1, ...data.severity_distribution.map((item: any) => item.count))
+  const severityDistribution = data.severity_distribution.map((item: any) => ({
+    ...item,
+    color: levelStyles[item.level]?.score || '#71717a',
+    width: `${(item.count / maxSeverityCount) * 100}%`,
+  }))
+  const recentCalls = data.recent_calls.map((call: any) => {
+    const style = levelStyles[call.priority_level] || {
+      background: 'bg-zinc-100 text-zinc-700',
+      dot: 'bg-zinc-500',
+      score: '#71717a',
+    }
+    const created = call.created_at ? new Date(call.created_at) : null
+    const elapsedMinutes = created && !Number.isNaN(created.getTime())
+      ? Math.max(0, Math.floor((Date.now() - created.getTime()) / 60000))
+      : null
+    return {
+      ...call,
+      caller_name: call.caller_name || 'Not available',
+      caller_phone: call.caller_phone || 'Not available',
+      time_ago: elapsedMinutes == null ? 'Not available' : elapsedMinutes < 1 ? 'Just now' : `${elapsedMinutes}m ago`,
+      priority_level: call.priority_level || 'Not available',
+      priority_color: style.background,
+      dot_color: style.dot,
+      score_color: style.score,
+    }
+  })
 
   const callRateData = {
     labels: data.call_rate_7days.labels,
@@ -181,8 +126,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Total Calls</p>
-          <p className="text-3xl font-semibold mb-2">{data.total_calls.toLocaleString()}</p>
-          <p className="text-green-600 text-xs">↑ 3.4% since last month</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.total_calls)}</p>
+          <p className="text-green-600 text-xs">Records stored in PostgreSQL</p>
         </div>
 
         {/* Card 2: Critical */}
@@ -193,8 +138,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Critical</p>
-          <p className="text-3xl font-semibold mb-2">{data.critical_calls}</p>
-          <p className="text-red-600 text-xs">↑ 5 since last week</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.critical_calls)}</p>
+          <p className="text-red-600 text-xs">Based on backend priority analysis</p>
         </div>
 
         {/* Card 3: Today's Calls */}
@@ -205,8 +150,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Today's Calls</p>
-          <p className="text-3xl font-semibold mb-2">{data.todays_calls}</p>
-          <p className="text-green-600 text-xs">↑ 1.2% since yesterday</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.todays_calls)}</p>
+          <p className="text-green-600 text-xs">Calls received today</p>
         </div>
 
         {/* Card 4: Resolved */}
@@ -217,8 +162,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Resolved</p>
-          <p className="text-3xl font-semibold mb-2">{data.resolved.toLocaleString()}</p>
-          <p className="text-green-600 text-xs">↑ 7.1% since last month</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.resolved)}</p>
+          <p className="text-green-600 text-xs">Records with resolved status</p>
         </div>
 
         {/* Card 5: Dispatched */}
@@ -229,8 +174,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Dispatched</p>
-          <p className="text-3xl font-semibold mb-2">{data.dispatched}</p>
-          <p className="text-red-600 text-xs">↓ 1.0% since last week</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.dispatched)}</p>
+          <p className="text-red-600 text-xs">No persisted dispatch records available</p>
         </div>
 
         {/* Card 6: Avg Severity */}
@@ -241,8 +186,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Avg Severity</p>
-          <p className="text-3xl font-semibold mb-2">{data.average_severity}</p>
-          <p className="text-zinc-500 text-xs">/100 score</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.average_severity)}</p>
+          <p className="text-zinc-500 text-xs">Mean of backend priority scores / 100</p>
         </div>
 
         {/* Card 7: Pending */}
@@ -253,8 +198,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Pending</p>
-          <p className="text-3xl font-semibold mb-2">{data.pending}</p>
-          <p className="text-zinc-500 text-xs">Awaiting triage</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.pending)}</p>
+          <p className="text-zinc-500 text-xs">Received or awaiting analysis</p>
         </div>
 
         {/* Card 8: Active Incidents */}
@@ -265,8 +210,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Active Incidents</p>
-          <p className="text-3xl font-semibold mb-2">{data.active_incidents}</p>
-          <p className="text-red-600 text-xs">↓ 3 since yesterday</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(data.active_incidents)}</p>
+          <p className="text-red-600 text-xs">No persisted incident records available</p>
         </div>
       </div>
 
@@ -319,7 +264,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {data.recent_calls.map((call: any) => (
+                {recentCalls.map((call: any) => (
                   <tr
                     key={call.id}
                     className={`border-b border-zinc-100 ${
@@ -347,12 +292,12 @@ export default function Dashboard() {
                     </td>
                     <td className="py-2 px-2">
                       <div>
-                        <span className="text-sm font-medium">{call.final_score}</span>
+                        <span className="text-sm font-medium">{formatMetric(call.final_score)}</span>
                         <div className="w-10 h-0.5 mt-1 rounded-full bg-zinc-200">
                           <div
                             className="h-0.5 rounded-full"
                             style={{
-                              width: `${call.final_score}%`,
+                              width: call.final_score == null ? '0%' : `${call.final_score}%`,
                               background: call.score_color,
                             }}
                           />
@@ -377,7 +322,7 @@ export default function Dashboard() {
           <p className="text-xs text-zinc-500 mb-4">Calls by priority level</p>
 
           <div className="space-y-3 mb-4">
-            {data.severity_distribution.map((item: any) => (
+            {severityDistribution.map((item: any) => (
               <div key={item.level} className="flex items-center gap-2">
                 <span className="text-xs text-zinc-500 w-16">{item.level}</span>
                 <div className="flex-1 h-2 bg-zinc-100 rounded-full">
@@ -396,22 +341,17 @@ export default function Dashboard() {
           <div className="border-t border-zinc-200 pt-3 mt-3">
             <p className="text-xs text-zinc-500 mb-2">Emergency channels</p>
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-zinc-50 rounded-md p-2">
-                <div className="text-xs text-zinc-500">112</div>
-                <div className="text-base font-semibold">Police</div>
-              </div>
-              <div className="bg-zinc-50 rounded-md p-2">
-                <div className="text-xs text-zinc-500">100</div>
-                <div className="text-base font-semibold">Fire</div>
-              </div>
-              <div className="bg-zinc-50 rounded-md p-2">
-                <div className="text-xs text-zinc-500">108</div>
-                <div className="text-base font-semibold">Ambulance</div>
-              </div>
-              <div className="bg-zinc-50 rounded-md p-2">
-                <div className="text-xs text-zinc-500">101</div>
-                <div className="text-base font-semibold">Disaster</div>
-              </div>
+              {data.channels.length > 0 ? data.channels.slice(0, 4).map((channel: any) => (
+                <div key={channel.source} className="bg-zinc-50 rounded-md p-2">
+                  <div className="text-xs text-zinc-500">{channel.source}</div>
+                  <div className="text-base font-semibold">{channel.count} calls</div>
+                </div>
+              )) : (
+                <div className="bg-zinc-50 rounded-md p-2">
+                  <div className="text-xs text-zinc-500">Not available</div>
+                  <div className="text-base font-semibold">No call sources</div>
+                </div>
+              )}
             </div>
           </div>
         </div>

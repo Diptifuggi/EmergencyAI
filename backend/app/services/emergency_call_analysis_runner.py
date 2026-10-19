@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import time
+import uuid
+
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.database import async_session
 from ..core.logger import get_logger
 from ..models.emergency_call import EmergencyCall
 from ..schemas.emergency_analysis import (
@@ -53,9 +57,9 @@ async def run_post_create_analysis(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.warning(
-            "Failed to persist analyzing status for emergency %s: %s",
+            "Failed to persist analyzing status emergency_id=%s error_type=%s",
             emergency.id,
-            exc,
+            type(exc).__name__,
         )
         if emergency.id is not None:
             persisted = await db.get(EmergencyCall, emergency.id)
@@ -86,10 +90,10 @@ async def run_post_create_analysis(
         )
     except SQLAlchemyError as exc:
         await db.rollback()
-        logger.exception(
-            "Failed to persist analysis outcome for emergency %s: %s",
+        logger.error(
+            "Failed to persist analysis outcome emergency_id=%s error_type=%s",
             emergency.id,
-            exc,
+            type(exc).__name__,
         )
         if emergency.id is not None:
             persisted = await db.get(EmergencyCall, emergency.id)
@@ -97,3 +101,29 @@ async def run_post_create_analysis(
                 return persisted
 
     return emergency
+
+
+async def run_post_create_analysis_in_background(emergency_id: uuid.UUID) -> None:
+    """Analyze a persisted emergency using a session independent of the request."""
+    started_at = time.perf_counter()
+    try:
+        async with async_session() as db:
+            emergency = await db.get(EmergencyCall, emergency_id)
+            if emergency is None:
+                logger.warning(
+                    "Background analysis skipped; emergency not found emergency_id=%s",
+                    emergency_id,
+                )
+                return
+            await run_post_create_analysis(db, emergency)
+    except Exception:
+        logger.exception(
+            "Background emergency analysis failed emergency_id=%s",
+            emergency_id,
+        )
+    finally:
+        logger.info(
+            "Background emergency analysis finished emergency_id=%s elapsed_ms=%.1f",
+            emergency_id,
+            (time.perf_counter() - started_at) * 1000,
+        )

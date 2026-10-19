@@ -1,7 +1,6 @@
-// @ts-nocheck
-import axiosInstance from './axios'
+import axiosClient from '@/api/axiosClient'
 
 export async function getAnalytics(): Promise<any> {
-  const resp = await axiosInstance.get('/analytics')
-  return resp.data
+  const response = await axiosClient.get('/analytics/summary')
+  return response.data.analytics
 }

@@ -1,7 +1,9 @@
 class EmergencyCall {
   final String id;
+  final String? userId;
   final String callType;
   final String? textContent;
+  final String? requestedLanguage;
   final String? language;
   final String status;
   final String priority;
@@ -23,11 +25,14 @@ class EmergencyCall {
   final String? mapSnapshotUrl;
   final String? createdAt;
   final String? updatedAt;
+  final Map<String, dynamic> rawJson;
 
   EmergencyCall({
     required this.id,
+    this.userId,
     required this.callType,
     this.textContent,
+    this.requestedLanguage,
     this.language,
     required this.status,
     required this.priority,
@@ -49,14 +54,17 @@ class EmergencyCall {
     this.mapSnapshotUrl,
     this.createdAt,
     this.updatedAt,
+    this.rawJson = const {},
   });
 
   /// Tolerant parser: unknown/future API fields are ignored.
   factory EmergencyCall.fromJson(Map<String, dynamic> json) {
     return EmergencyCall(
       id: json['id'] as String,
+      userId: json['user_id'] as String?,
       callType: json['call_type'] as String? ?? 'unknown',
       textContent: json['text_content'] as String?,
+      requestedLanguage: json['requested_language'] as String?,
       language: json['language'] as String?,
       status: json['status'] as String? ?? 'unknown',
       priority: json['priority'] as String? ?? 'normal',
@@ -81,6 +89,7 @@ class EmergencyCall {
       mapSnapshotUrl: json['map_snapshot_url'] as String?,
       createdAt: json['created_at']?.toString(),
       updatedAt: json['updated_at']?.toString(),
+      rawJson: Map<String, dynamic>.from(json),
     );
   }
 }

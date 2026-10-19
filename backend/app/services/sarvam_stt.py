@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -19,13 +20,6 @@ class SarvamTranscriptionError(Exception):
     def __init__(self, message: str, provider_status_code: int | None = None):
         super().__init__(message)
         self.provider_status_code = provider_status_code
-
-
-def _safe_response_body(response: httpx.Response) -> str:
-    body = response.text[:2000]
-    if settings.SARVAM_API_KEY.strip():
-        body = body.replace(settings.SARVAM_API_KEY.strip(), "[REDACTED]")
-    return body
 
 
 async def transcribe_audio(
@@ -49,15 +43,15 @@ async def transcribe_audio(
     }
 
     logger.info(
-        "[STT] Calling Sarvam url=%s language_code=%s model=%s mode=%s bytes=%d filename=%s content_type=%s",
+        "[STT] Sarvam request start url=%s language_code=%s model=%s mode=%s bytes=%d content_type=%s",
         settings.SARVAM_API_URL,
         sarvam_code,
         settings.SARVAM_STT_MODEL,
         data["mode"],
         len(audio),
-        filename,
         content_type or "application/octet-stream",
     )
+    started_at = time.perf_counter()
     try:
         async with httpx.AsyncClient(timeout=settings.SARVAM_TIMEOUT_SECONDS) as client:
             response = await client.post(
@@ -67,31 +61,32 @@ async def transcribe_audio(
                 files={"file": (filename, audio, content_type or "application/octet-stream")},
             )
     except httpx.TimeoutException as exc:
+        logger.warning(
+            "[STT] Sarvam timeout error_type=%s elapsed_ms=%.1f",
+            type(exc).__name__,
+            (time.perf_counter() - started_at) * 1000,
+        )
         raise SarvamTranscriptionError("Speech transcription timed out. Please try again.") from exc
     except httpx.HTTPError as exc:
-        logger.warning("Sarvam STT request failed: %s", exc)
+        logger.warning(
+            "[STT] Sarvam request failed error_type=%s elapsed_ms=%.1f",
+            type(exc).__name__,
+            (time.perf_counter() - started_at) * 1000,
+        )
         raise SarvamTranscriptionError("Speech transcription service is unavailable.") from exc
 
     logger.info(
-        "[STT] Sarvam response status=%d body=%s",
+        "[STT] Sarvam response status=%d elapsed_ms=%.1f",
         response.status_code,
-        _safe_response_body(response),
+        (time.perf_counter() - started_at) * 1000,
     )
     if response.status_code in {401, 403}:
         logger.error("Sarvam STT rejected the configured API credential status=%d", response.status_code)
         raise SarvamTranscriptionError("Speech transcription is not configured correctly on the server.")
     if response.status_code >= 400:
         logger.warning("Sarvam STT returned status=%d", response.status_code)
-        detail = ""
-        try:
-            error = response.json().get("error", {})
-            if isinstance(error, dict):
-                detail = str(error.get("message") or "").strip()
-        except ValueError:
-            pass
-        suffix = f": {detail}" if detail else ""
         raise SarvamTranscriptionError(
-            f"Sarvam transcription failed (HTTP {response.status_code}){suffix}",
+            f"Sarvam transcription failed (HTTP {response.status_code})",
             provider_status_code=response.status_code,
         )
 
