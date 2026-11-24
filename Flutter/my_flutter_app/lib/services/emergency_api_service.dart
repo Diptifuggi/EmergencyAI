@@ -487,6 +487,30 @@ class EmergencyApiService {
         .toList();
     return items;
   }
+
+  Future<EmergencyCall> getEmergencyCall({required String callId}) async {
+    final baseUrl = await ApiClient.getBaseUrl();
+    final uri = _endpoint(
+      baseUrl,
+      '${ApiConfig.emergencyCallsEndpoint}/${Uri.encodeComponent(callId)}',
+    );
+    final response = await _request(
+      ApiClient.client.get(uri, headers: {'Accept': 'application/json'}),
+      method: 'GET',
+      uri: uri,
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(_backendError(
+        response,
+        'Unable to refresh the emergency report. Please try again.',
+      ));
+    }
+
+    return EmergencyCall.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
 }
 
 class SarvamTranscription {

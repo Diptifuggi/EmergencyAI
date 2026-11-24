@@ -15,6 +15,7 @@ from app.schemas.emergency_analysis import (
     HelpRequired,
 )
 from app.services.emergency_analysis_service import EmergencyAnalysisService
+from app.services.incident_rules import extract_incident_facts
 from app.services.ollama_client import OllamaClient
 
 
@@ -72,9 +73,10 @@ async def test_police_women_safety_analysis() -> None:
     assert result.analysis.emergency_type == EmergencyType.WOMEN_SAFETY
     assert HelpRequired.POLICE in result.analysis.help_required
     assert result.analysis.priority_level == AnalysisLevel.HIGH
-    assert 0 <= result.analysis.panic_score <= 100
-    assert 0 <= result.analysis.stress_score <= 100
-    assert 0.0 <= result.analysis.confidence <= 1.0
+    assert result.analysis.panic_score is None
+    assert result.analysis.stress_score is None
+    assert result.analysis.confidence is None
+    assert result.analysis.human_confirmation_required is True
     assert "police" in result.analysis.dispatch_recommendation.recommended_units
     assert result.suggested_status == STATUS_ANALYZED
 
@@ -181,6 +183,24 @@ async def test_non_emergency_low_priority() -> None:
 
 
 @pytest.mark.asyncio
+async def test_severity_and_priority_are_derived_independently() -> None:
+    service = EmergencyAnalysisService(_mock_client(json.dumps(_valid_analysis_payload())))
+
+    result = await service.analyze(
+        EmergencyAnalysisInput(
+            text_content="Someone is following me right now. Please send police.",
+            language="en",
+            call_type="text",
+        )
+    )
+
+    assert result.success is True
+    assert result.analysis is not None
+    assert result.analysis.severity == AnalysisLevel.MEDIUM
+    assert result.analysis.priority_level == AnalysisLevel.HIGH
+
+
+@pytest.mark.asyncio
 async def test_empty_transcript_failure() -> None:
     client = OllamaClient()
     client.generate_json = AsyncMock()  # type: ignore[method-assign]
@@ -223,6 +243,45 @@ async def test_ollama_unavailable() -> None:
     assert result.analysis.emergency_type == EmergencyType.FIRE
     assert HelpRequired.FIRE_SERVICE in result.analysis.help_required
     assert result.suggested_status == STATUS_ANALYZED
+
+
+@pytest.mark.asyncio
+async def test_hindi_code_mixed_chest_pain_uses_safe_rules_fallback() -> None:
+    client = OllamaClient()
+    client.generate_json = AsyncMock(  # type: ignore[method-assign]
+        side_effect=OllamaUnavailableError("Ollama backend is unavailable")
+    )
+    service = EmergencyAnalysisService(client)
+    transcript = "मुझे चेस्ट में दर्द हो रहा हे प्लीज हेल्प चाहिए में घर पर अकेली हु"
+    facts = extract_incident_facts(transcript, "hi")
+    assert facts.injuries_present is False
+    assert facts.severe_bleeding is False
+    assert facts.unconscious_person is False
+
+    result = await service.analyze(
+        EmergencyAnalysisInput(
+            text_content=transcript,
+            language="hi-IN",
+            call_type="text",
+        )
+    )
+
+    assert result.success is True
+    assert result.analysis is not None
+    assert result.analysis.incident_description.startswith(
+        "Caller reports a medical emergency;"
+    )
+    assert "चेस्ट में दर्द" in result.analysis.incident_description
+    assert result.analysis.injuries_present is False
+    assert result.analysis.severe_bleeding is False
+    assert result.analysis.unconscious_person is False
+    assert result.analysis.emergency_type == EmergencyType.MEDICAL
+    assert result.analysis.priority_level == AnalysisLevel.CRITICAL
+    assert result.analysis.location_description is None
+    assert HelpRequired.AMBULANCE in result.analysis.help_required
+    assert "चेस्ट में दर्द" in result.analysis.emergency_keywords
+    assert result.analysis.confidence is None
+    assert result.analysis.human_confirmation_required is True
 
 
 @pytest.mark.asyncio

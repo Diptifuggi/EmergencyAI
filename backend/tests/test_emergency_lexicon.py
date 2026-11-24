@@ -40,6 +40,9 @@ from app.schemas.emergency_analysis import HelpRequired
         ("train patri se utar gayi, help bhejo", "en", "railway"),
         ("Someone has chest pain and cannot breathe.", "en", "medical"),
         ("मेरी मां सांस नहीं ले रही, एम्बुलेंस भेजो।", "hi", "medical"),
+        ("मुझे चेस्ट में दर्द हो रहा हे प्लीज हेल्प चाहिए में घर पर अकेली हु", "hi", "medical"),
+        ("छाती में दर्द है और सांस लेने में तकलीफ है।", "hi", "medical"),
+        ("chest mein pain ho raha hai, ambulance bhejo", "en", "medical"),
         ("છાતીમાં દુખાવો છે અને શ્વાસ લેવામાં તકલીફ છે.", "gu", "medical"),
         ("छातीत दुखत आहे आणि श्वास घेता येत नाही.", "mr", "medical"),
         ("bhai behosh hai, ambulance moklo", "en", "medical"),
@@ -152,3 +155,18 @@ def test_railway_context_does_not_infer_road_accident() -> None:
 
 def test_lexicon_has_many_auditable_terms() -> None:
     assert sum(1 for _ in iter_terms()) >= 700
+
+
+def test_hindi_chest_pain_does_not_infer_injury_bleeding_or_unconsciousness() -> None:
+    transcript = "मुझे चेस्ट में दर्द हो रहा हे प्लीज हेल्प चाहिए में घर पर अकेली हु"
+    flags = evidence(transcript, "hi")
+    facts = extract_incident_facts(transcript, "hi")
+
+    assert flags["medical"] is True
+    assert flags["high_risk_medical"] is True
+    assert flags["injury"] is False
+    assert flags["bleeding"] is False
+    assert flags["unconscious"] is False
+    assert facts.injuries_present is False
+    assert facts.severe_bleeding is False
+    assert facts.unconscious_person is False

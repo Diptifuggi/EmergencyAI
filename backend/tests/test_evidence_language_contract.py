@@ -65,17 +65,24 @@ async def test_unsupported_llm_facts_are_not_promoted_to_dispatch() -> None:
     assert analysis.railway_incident is True
     assert analysis.child_involved is False
     assert analysis.children_involved is False
-    assert analysis.victim_count is None
-    assert analysis.help_required == [HelpRequired.UNKNOWN]
-    assert analysis.recommended_units == []
-    assert analysis.dispatch_recommendation.recommended_units == []
-    assert analysis.dispatch_recommendation.emergency_numbers == {}
+    assert analysis.victim_count == 1
+    assert analysis.victim_count_source == "default"
+    assert analysis.help_required == [HelpRequired.POLICE, HelpRequired.AMBULANCE]
+    assert analysis.recommended_units == ["police", "ambulance"]
+    assert analysis.dispatch_recommendation.recommended_units == ["police", "ambulance"]
+    assert analysis.dispatch_recommendation.emergency_numbers == {
+        "100": "Police",
+        "108": "Ambulance / Medical Emergency",
+        "102": "Ambulance / Medical Emergency",
+        "139": "Railway Assistance",
+    }
     assert analysis.location_description == "રેલવે સ્ટેશન"
-    assert analysis.panic_score == 0
-    assert analysis.panic_level.value == "LOW"
-    assert analysis.stress_score == 0
-    assert analysis.stress_level.value == "LOW"
-    assert analysis.confidence == 0.0
+    assert analysis.panic_score is None
+    assert analysis.panic_level is None
+    assert analysis.stress_score is None
+    assert analysis.stress_level is None
+    assert analysis.confidence is None
+    assert analysis.human_confirmation_required is True
 
 
 @pytest.mark.asyncio
@@ -110,7 +117,7 @@ def test_hindi_railway_count_location_request_and_no_road_inference() -> None:
     assert facts.location_description == "आनंद रेलवे स्टेशन"
     assert facts.caller_request == "मदद भेजे"
     assert services_for_facts(facts).count(HelpRequired.AMBULANCE) == 1
-    assert HelpRequired.POLICE not in services_for_facts(facts)
+    assert HelpRequired.POLICE in services_for_facts(facts)
 
 
 def test_explicit_child_injury_is_supported() -> None:
@@ -137,7 +144,7 @@ def test_current_train_accident_with_unspecified_many_injured() -> None:
     assert facts.current_emergency is True
     assert facts.railway_incident is True
     assert facts.injuries_present is True
-    assert facts.victim_count is None
+    assert facts.victim_count == 5
 
 
 def test_hindi_number_word_request_and_keywords() -> None:

@@ -328,3 +328,105 @@ async def test_live_ollama_police_scenario(async_client: AsyncClient) -> None:
     assert "police" in analysis["dispatch_recommendation"]["recommended_units"] or any(
         unit == "police" for unit in analysis.get("help_required", [])
     )
+
+
+@pytest.mark.asyncio
+async def test_hindi_text_submission_is_persisted_and_returned_by_get(
+    async_client: AsyncClient,
+) -> None:
+    transcript = "मुझे चेस्ट में दर्द हो रहा हे प्लीज हेल्प चाहिए में घर पर अकेली हु"
+    metadata = {
+        "platform": "flutter",
+        "requested_language": "hi-in",
+        "map_snapshot_status": "Map snapshot available",
+        "client_marker": "preserve",
+    }
+
+    with patch(
+        "app.services.ollama_client.OllamaClient.generate_json",
+        new_callable=AsyncMock,
+        return_value=valid_ollama_json(emergency_type="unknown"),
+    ) as mock_model:
+        response = await async_client.post(
+            "/api/v1/emergency-calls/text",
+            json={
+                "text": transcript,
+                "language": "hi-IN",
+                "latitude": 22.5399067,
+                "longitude": 72.9274691,
+                "location_accuracy": 8.0,
+                "client_metadata": metadata,
+            },
+        )
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["status"] == STATUS_ANALYZING
+    assert created["text_content"] == transcript
+    assert created["language"] == "hi-IN"
+    mock_model.assert_awaited_once()
+
+    fetched = await async_client.get(f"/api/v1/emergency-calls/{created['id']}")
+    assert fetched.status_code == 200
+    saved = fetched.json()
+    assert saved["status"] == STATUS_ANALYZED
+    assert saved["priority"] == "critical"
+    assert saved["text_content"] == transcript
+    assert saved["latitude"] == 22.5399067
+    assert saved["longitude"] == 72.9274691
+    assert saved["location_accuracy"] == 8.0
+    assert saved["client_metadata"]["platform"] == "flutter"
+    assert saved["client_metadata"]["requested_language"] == "hi-in"
+    assert saved["client_metadata"]["map_snapshot_status"] == "Map snapshot available"
+    assert saved["client_metadata"]["client_marker"] == "preserve"
+
+    analysis = saved["client_metadata"]["emergency_analysis"]
+    assert set(analysis) == set(EmergencyAnalysis.model_fields)
+    assert analysis["emergency_type"] == "medical"
+    assert analysis["priority_level"] == "CRITICAL"
+    assert analysis["priority_score"] >= 76
+    assert analysis["location_description"] is None
+    assert "ambulance" in analysis["recommended_units"]
+    assert analysis["recommended_units"] == analysis["dispatch_recommendation"]["recommended_units"]
+    assert analysis["dispatch_recommendation"]["emergency_numbers"]["112"]
+    assert analysis["dispatch_recommendation"]["emergency_numbers"]["108"]
+    assert all(
+        isinstance(label, str)
+        for label in analysis["dispatch_recommendation"]["emergency_numbers"].values()
+    )
+    assert analysis["injuries_present"] is False
+    assert analysis["severe_bleeding"] is False
+    assert analysis["unconscious_person"] is False
+    assert analysis["human_confirmation_required"] is True
+    assert analysis["confidence"] is None
+
+
+@pytest.mark.asyncio
+async def test_unexpected_analysis_exception_does_not_leave_call_analyzing(
+    async_client: AsyncClient,
+) -> None:
+    with patch(
+        "app.services.emergency_call_analysis_runner.EmergencyAnalysisService.analyze",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("test-only failure"),
+    ):
+        response = await async_client.post(
+            "/api/v1/emergency-calls/text",
+            json={
+                "text": "मुझे चेस्ट में दर्द हो रहा है",
+                "language": "hi-IN",
+                "client_metadata": {"platform": "flutter", "preserve": "yes"},
+            },
+        )
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["status"] == STATUS_ANALYZING
+
+    fetched = await async_client.get(f"/api/v1/emergency-calls/{created['id']}")
+    assert fetched.status_code == 200
+    saved = fetched.json()
+    assert saved["status"] == STATUS_ANALYSIS_FAILED
+    assert saved["client_metadata"]["preserve"] == "yes"
+    assert saved["client_metadata"]["emergency_analysis_error"]["code"] == "analysis_error"
+    assert "emergency_analysis" not in saved["client_metadata"]

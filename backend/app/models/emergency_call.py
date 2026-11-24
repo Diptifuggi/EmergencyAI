@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.database import Base
+from ..services.map_snapshot_storage import resolve_map_snapshot_path
 
 
 class EmergencyCall(Base):
@@ -58,6 +59,9 @@ class EmergencyCall(Base):
         DateTime(timezone=True), nullable=True
     )
     location_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    location_address_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unavailable", server_default="unavailable"
+    )
     # This is derived by the server/database from the coordinates; clients do not set it.
     location_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="unavailable", server_default="unavailable"
@@ -79,7 +83,7 @@ class EmergencyCall(Base):
 
     @property
     def map_snapshot_available(self) -> bool:
-        return bool(self.map_snapshot_file_path)
+        return resolve_map_snapshot_path(self.map_snapshot_file_path) is not None
 
     @property
     def requested_language(self) -> str | None:

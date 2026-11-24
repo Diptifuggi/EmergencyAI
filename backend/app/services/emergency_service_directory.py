@@ -16,6 +16,28 @@ SERVICE_DIRECTORY: dict[str, list[str]] = {
     "senior_citizen": ["14567"],
 }
 
+HELP_TO_SERVICE_DIRECTORY: dict[str, tuple[str, ...]] = {
+    "police": ("police",),
+    "ambulance": ("ambulance",),
+    "medical_assistance": ("ambulance",),
+    "fire_service": ("fire_service",),
+    "rescue": (),
+    "women_safety_support": ("women_safety_support",),
+    "child_protection": ("child_protection",),
+    "cybercrime": ("cybercrime",),
+    "lpg": ("lpg",),
+}
+
+HELP_TO_OPERATIONAL_UNITS: dict[str, tuple[str, ...]] = {
+    "police": ("police",),
+    "ambulance": ("ambulance",),
+    "medical_assistance": ("medical_assistance",),
+    "fire_service": ("fire_service",),
+    "rescue": ("rescue",),
+    "women_safety_support": ("women_safety_support",),
+    "child_protection": ("child_protection",),
+}
+
 CONTACT_NAMES = {
     "112": "Integrated Emergency Response",
     "100": "Police",
@@ -28,6 +50,7 @@ CONTACT_NAMES = {
     "1930": "Cyber Crime",
     "1906": "LPG Leak",
     "1073": "Road Accident Assistance",
+    "1033": "National Highway Helpline",
     "139": "Railway Assistance",
     "14567": "Senior Citizen Helpline",
     "1070": "Disaster Management",
@@ -37,6 +60,24 @@ CONTACT_NAMES = {
 
 def numbers_for_services(services: list[str]) -> dict[str, list[str]]:
     return {service: SERVICE_DIRECTORY[service] for service in services if service in SERVICE_DIRECTORY}
+
+
+def numbers_for_help(help_values: list[str]) -> list[str]:
+    services = dict.fromkeys(
+        service
+        for help_value in help_values
+        for service in HELP_TO_SERVICE_DIRECTORY.get(help_value, ())
+    )
+    return list(services)
+
+
+def operational_units_for_help(help_values: list[str]) -> list[str]:
+    units = dict.fromkeys(
+        unit
+        for help_value in help_values
+        for unit in HELP_TO_OPERATIONAL_UNITS.get(help_value, ())
+    )
+    return list(units)
 
 
 def emergency_contacts_for_services(services: list[str], *, serious: bool = False) -> dict[str, str]:

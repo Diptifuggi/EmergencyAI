@@ -16,15 +16,16 @@ from ..schemas.emergency_analysis import (
     EmergencyAnalysisResult,
     EmergencyType,
     HelpRequired,
+    AnalysisLevel,
     SUPPORTED_LANGUAGES,
     _RawEmergencyAnalysis,
 )
 from .analysis_normalizers import normalize_emergency_type
 from .emergency_keywords import evidence
-from .incident_rules import extract_incident_facts, services_for_facts
+from .incident_rules import IncidentFacts, extract_incident_facts, services_for_facts
 from .ollama_client import OllamaClient
 from .scoring_policy import (
-    calculate_priority_score,
+    calculate_priority_score_raw,
     calculate_help_required,
     clamp_score,
     level_for_score,
@@ -36,27 +37,107 @@ from .scoring_policy import (
 logger = get_logger("app.services.emergency_analysis_service")
 
 
-def _dispatch_reason(facts) -> str:
+_TYPE_LABELS = {
+    EmergencyType.CRIME_POLICE: "active crime or police-safety incident",
+    EmergencyType.MEDICAL: "medical emergency",
+    EmergencyType.POLICE: "police-assistance incident",
+    EmergencyType.FIRE: "fire emergency",
+    EmergencyType.ACCIDENT: "transport accident",
+    EmergencyType.WOMEN_SAFETY: "women's safety incident",
+    EmergencyType.DOMESTIC_VIOLENCE: "domestic-violence incident",
+    EmergencyType.CHILD_SAFETY: "child-safety or missing-person incident",
+    EmergencyType.CYBERCRIME: "cybercrime report",
+    EmergencyType.LPG: "LPG or gas hazard",
+    EmergencyType.ROBBERY: "robbery report",
+    EmergencyType.ASSAULT: "assault report",
+    EmergencyType.HARASSMENT: "harassment report",
+    EmergencyType.DISASTER: "disaster or rescue incident",
+    EmergencyType.OTHER: "other reported concern",
+    EmergencyType.UNKNOWN: "unclassified report",
+}
+
+
+def _reported_evidence(facts: IncidentFacts) -> list[str]:
+    evidence: list[str] = []
+    if facts.victim_count_source == "default":
+        evidence.append("at least 1 person assumed (no count stated)")
+    for condition, label in (
+        (facts.immediate_danger, "immediate danger"),
+        (facts.injuries_present, "reported injuries"),
+        (facts.severe_bleeding, "severe bleeding"),
+        (facts.unconscious_person, "an unconscious person"),
+        (facts.fire_present, "fire"),
+        (facts.smoke_present, "smoke"),
+        (facts.explosion_present, "an explosion"),
+        (facts.trapped_persons, "trapped people"),
+        (facts.weapon_present, "a reported weapon"),
+        (facts.road_accident, "a road accident"),
+        (facts.railway_incident, "a railway incident"),
+        (facts.highway_incident, "a highway location"),
+        (facts.domestic_violence, "domestic violence"),
+        (facts.sexual_violence, "sexual violence"),
+        (facts.missing_person, "a missing person"),
+        (facts.cyber_crime, "suspected cybercrime"),
+        (facts.lpg_leak, "an LPG/gas leak"),
+        (facts.heavy_rain, "heavy rain"),
+        (facts.flood_risk, "possible flood risk"),
+        (facts.flood_confirmed, "reported flooding"),
+    ):
+        if condition:
+            evidence.append(label)
+    if facts.victim_count is not None and facts.victim_count_source != "default":
+        qualifier = "about " if facts.victim_count_approximate else ""
+        if facts.victim_count_source == "explicit":
+            evidence.append(f"{qualifier}{facts.victim_count} explicitly reported people")
+        else:
+            evidence.append(f"{qualifier}{facts.victim_count} people estimated")
+    if facts.emergency_keywords:
+        evidence.extend(facts.emergency_keywords[:5])
+    return list(dict.fromkeys(evidence))[:6]
+
+
+def _incident_description(facts: IncidentFacts, emergency_type: EmergencyType) -> str:
+    if facts.hypothetical:
+        return "Caller asks about a hypothetical emergency; no current incident is established."
+    label = _TYPE_LABELS[emergency_type]
+    if facts.negated:
+        return f"Caller explicitly negates evidence of a {label}; confirm if the situation has changed."
+    if facts.historical:
+        return f"Caller describes a past {label}; current danger is not established."
+    if facts.resolved:
+        return f"Caller reports a resolved {label}; confirm whether anyone still needs assistance."
+    if facts.uncertain or facts.flood_risk:
+        prefix = "Caller is uncertain about a possible" if facts.uncertain else "Caller reports a possible"
+        details = _reported_evidence(facts)
+        suffix = f"; reported evidence: {', '.join(details)}" if details else ""
+        return f"{prefix} {label}{suffix}."
     if not facts.current_emergency:
-        return f"No dispatch recommendation: the report is {facts.context_state}."
-    if facts.burglary_in_progress:
-        return "Caller reports an active home intrusion/burglary and requests police assistance."
-    if facts.medical_emergency:
-        return "Caller reports a medical emergency based on the provided information."
-    if facts.fire_present:
-        return "Caller reports fire or explosion evidence based on the provided information."
-    if facts.road_accident:
-        return "Caller reports a road accident based on the provided information."
-    if facts.railway_incident:
-        details = f" involving {facts.victim_count} injured people" if facts.victim_count is not None else ""
-        request = " and requests assistance" if facts.caller_request else ""
-        return f"Caller reports a railway/train accident{details}{request}."
-    if facts.cyber_crime:
-        return "Caller reports suspected online or cyber fraud based on the provided information."
-    return "Based on the provided information, recommended units require human dispatcher confirmation."
+        return f"The report describes a {facts.context_state} {label}; no current incident is established."
+    if facts.sub_type == "self_harm_crisis":
+        return "Caller reports a person in crisis; provide supportive assistance and operator review."
+    details = _reported_evidence(facts)
+    if details:
+        return f"Caller reports a {label}; reported evidence: {', '.join(details)}."
+    if emergency_type == EmergencyType.UNKNOWN:
+        return "The report does not identify a supported incident type; operator clarification is required."
+    return f"Caller reports a {label}; confirm details and current risk with the caller."
 
 
-def _priority_reason(facts) -> str:
+def _dispatch_reason(
+    facts: IncidentFacts, emergency_type: EmergencyType, units: list[str]
+) -> str:
+    description = _incident_description(facts, emergency_type)
+    if not facts.current_emergency:
+        return f"{description} Do not infer a live dispatch need from this report alone."
+    if units:
+        return f"{description} Consider the listed units for dispatcher review; the report does not confirm dispatch."
+    return (
+        f"{description} No operational unit is mapped to the reported assistance; "
+        "clarify the need with the caller."
+    )
+
+
+def _priority_reason(facts: IncidentFacts, priority_level: AnalysisLevel) -> str:
     reasons: list[str] = []
     if facts.immediate_danger:
         reasons.append("immediate danger")
@@ -68,15 +149,59 @@ def _priority_reason(facts) -> str:
         reasons.append("fire or explosion evidence")
     if facts.trapped_persons:
         reasons.append("trapped persons")
-    if facts.victim_count is not None:
-        reasons.append(f"{facts.victim_count} explicitly injured people")
+    if facts.victim_count_source == "default":
+        reasons.append("at least 1 person assumed (no count stated)")
+    elif facts.victim_count is not None:
+        qualifier = "explicitly reported" if facts.victim_count_source == "explicit" else "estimated"
+        reasons.append(f"{facts.victim_count} {qualifier} people")
     if facts.injuries_present:
         reasons.append("explicit injury evidence")
-    if facts.caller_request:
-        reasons.append("caller requests assistance")
-    if not reasons:
-        return "No explicit urgency evidence detected."
-    return "Priority based on " + ", ".join(reasons) + "."
+    if facts.unconscious_person:
+        reasons.append("reported unconscious person")
+    if facts.severe_bleeding:
+        reasons.append("reported severe bleeding")
+    if facts.flood_confirmed:
+        reasons.append("reported flooding")
+    if facts.uncertain:
+        reasons.append("uncertain incident details")
+    if not facts.current_emergency:
+        return (
+            f"The report is {facts.context_state}; priority is {priority_level.value} "
+            "because current dispatch urgency is not established."
+        )
+    if reasons:
+        return f"{priority_level.value} priority reflects reported {', '.join(reasons)}."
+    return (
+        f"{priority_level.value} priority reflects the available incident evidence. "
+        "No explicit immediate-danger indicator was detected; this is not a safety finding."
+    )
+
+
+def _dispatch_action(
+    facts: IncidentFacts, priority_level: AnalysisLevel, units: list[str]
+) -> str:
+    if not facts.current_emergency:
+        return (
+            "Confirm whether the report describes a current incident before considering "
+            "dispatch. Human operator confirmation is required."
+        )
+    if facts.uncertain:
+        return (
+            "Clarify whether the danger is current, who is affected, and the caller's "
+            "location. Human operator confirmation is required before any dispatch."
+        )
+    if not units:
+        return (
+            "Clarify the assistance needed and consult local response procedures; no "
+            "operational unit is configured for this service. Human operator confirmation "
+            "is required."
+        )
+    return (
+        f"Review at {priority_level.value} priority and consider the listed units after "
+        "verifying the caller's location and circumstances. Human operator confirmation "
+        "is required; no units have been assigned or dispatched by this system."
+    )
+
 
 SYSTEM_PROMPT = """You are EmergencyIQ, an emergency dispatch triage assistant.
 Analyze ONLY the supplied emergency transcript text. Do not invent facts not present in the transcript.
@@ -300,8 +425,14 @@ class EmergencyAnalysisService:
             validated_fire = facts.fire_present
             validated_medical = facts.medical_emergency
             dispatch_units = recommended_units_for_help(help_required)
-            priority_score = (
-                calculate_priority_score(
+            severity_score = calculate_severity_score(
+                emergency_type=emergency_type,
+                transcript=transcript,
+                language=language,
+            )
+            severity_level = level_for_score(severity_score)
+            priority_score_raw = (
+                calculate_priority_score_raw(
                     emergency_type=emergency_type,
                     immediate_threat=facts.immediate_danger,
                     # Do not use an LLM-invented count as a dispatch multiplier.
@@ -310,50 +441,57 @@ class EmergencyAnalysisService:
                     transcript=transcript,
                     language=language,
                     victim_count=facts.victim_count,
+                    victim_count_source=facts.victim_count_source,
                     caller_request=facts.caller_request is not None,
                 )
                 if facts.current_emergency
-                else 0
+                else None
             )
+            priority_score = clamp_score(priority_score_raw) if priority_score_raw is not None else 0
             priority_level = level_for_score(priority_score)
-            # No calibrated model probability is available. Keep this
-            # compatibility field explicitly uncalibrated rather than presenting
-            # a hand-written score as statistical confidence.
-            confidence = 0.0
-            emergency_numbers = emergency_numbers_for_help(help_required)
-            reason = _dispatch_reason(facts)
+            # There is no calibrated model probability or supported emotion
+            # estimator, so those values are explicitly unavailable.
+            confidence = None
+            emergency_numbers = emergency_numbers_for_help(
+                help_required,
+                emergency_type=emergency_type,
+                highway_incident=facts.highway_incident and facts.road_accident,
+                railway_incident=facts.railway_incident
+                and emergency_type == EmergencyType.ACCIDENT,
+                serious=priority_score >= 51,
+            )
+            reason = _dispatch_reason(facts, emergency_type, dispatch_units)
             logger.info("[EmergencyIQ] Incident type detected: %s", emergency_type.value)
             logger.info("[EmergencyIQ] Priority calculated: %s", priority_level.value)
             logger.info("[EmergencyIQ] Police required: %s", facts.police_required)
             logger.info("[EmergencyIQ] Recommended units: %s", ", ".join(dispatch_units) or "none")
             logger.info("[EmergencyIQ] Emergency numbers: %s", ", ".join(emergency_numbers) or "none")
-            # These remain model-extracted textual indicators, but are bounded
-            # and categorised by backend policy rather than LLM labels.
-            # The project has no validated text/acoustic emotion model. Raw LLM
-            # panic/stress values are therefore never promoted to public scores.
-            panic_score = 0
-            stress_score = 0
-
             return EmergencyAnalysis(
                 emergency_type=emergency_type,
-                severity=priority_level,
+                severity=severity_level,
                 sub_type=facts.sub_type,
                 help_required=help_required,
                 emergency_keywords=facts.emergency_keywords,
                 priority_score=priority_score,
+                priority_score_raw=priority_score_raw,
                 priority_level=priority_level,
-                panic_score=panic_score,
-                panic_level=level_for_score(panic_score),
-                stress_score=stress_score,
-                stress_level=level_for_score(stress_score),
+                panic_score=None,
+                panic_level=None,
+                stress_score=None,
+                stress_level=None,
                 dispatch_recommendation={
                     "recommended_units": dispatch_units,
                     "emergency_numbers": emergency_numbers,
                     "reason": reason,
-                    "priority_reason": _priority_reason(facts),
-                    "dispatcher_action": "AI recommendation - human dispatcher confirmation required. Verify caller location and dispatch appropriate resources.",
+                    "priority_reason": _priority_reason(
+                        facts, priority_level
+                    ),
+                    "dispatcher_action": _dispatch_action(
+                        facts, priority_level, dispatch_units
+                    ),
                 },
                 confidence=confidence,
+                human_confirmation_required=True,
                 context_state=facts.context_state,
                 current_emergency=facts.current_emergency,
                 hypothetical=facts.hypothetical,
@@ -363,6 +501,7 @@ class EmergencyAnalysisService:
                 negated=facts.negated,
                 victim_count=facts.victim_count,
                 victim_count_approximate=facts.victim_count_approximate,
+                victim_count_source=facts.victim_count_source,
                 injuries_present=validated_injuries,
                 unconscious_person=facts.unconscious_person,
                 severe_bleeding=facts.severe_bleeding,
@@ -398,7 +537,7 @@ class EmergencyAnalysisService:
                 location_description=facts.location_description,
                 caller_request=facts.caller_request,
                 recommended_units=dispatch_units,
-                incident_description=transcript,
+                incident_description=_incident_description(facts, emergency_type),
             )
         except (ValueError, ValidationError) as exc:
             raise PipelineStepFailedError(

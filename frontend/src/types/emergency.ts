@@ -1,7 +1,12 @@
+import { normalizeEmergencyCall } from '@/lib/emergencyCallNormalizer'
+
 export interface EmergencyAnalysis {
   emergency_type?: string | null
+  severity?: string | null
   priority_score?: number | null
   priority_level?: string | null
+  confidence?: number | null
+  human_confirmation_required?: boolean | null
   panic_score?: number | null
   panic_level?: string | null
   stress_score?: number | null
@@ -39,6 +44,7 @@ export interface EmergencyCallResponse {
   location_accuracy?: number | null
   location_timestamp?: string | null
   location_address?: string | null
+  location_address_status?: string | null
   location_status?: string | null
   map_snapshot_available?: boolean
   map_snapshot_url?: string | null
@@ -51,6 +57,7 @@ export interface EmergencyCallResponse {
     captured_at?: string | null
     location_available?: boolean
     status?: string | null
+    address_status?: string | null
     reason?: string | null
   } | null
 }
@@ -63,57 +70,42 @@ export interface EmergencyCallListResponse {
   api_version?: string
 }
 
-function normalizeAnalysisPayload(raw: any): EmergencyAnalysis {
-  if (!raw || typeof raw !== 'object') return {}
-
-  if ('analysis' in raw && raw.analysis && typeof raw.analysis === 'object') {
-    return raw.analysis as EmergencyAnalysis
-  }
-
-  return raw as EmergencyAnalysis
-}
-
 export function analysisForCall(call: EmergencyCallResponse): EmergencyAnalysis {
-  const metadata = call.client_metadata && typeof call.client_metadata === 'object' ? call.client_metadata : {}
-  const result = metadata.emergency_analysis ?? metadata.analysis ?? {}
-  return normalizeAnalysisPayload(result)
+  return normalizeEmergencyCall(call).analysis as EmergencyAnalysis
 }
 
 export function categoryForCall(call: EmergencyCallResponse): string {
-  const type = analysisForCall(call).emergency_type || call.call_type
+  const type = normalizeEmergencyCall(call).category
   if (!type) return 'Not available'
   return String(type).replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase())
 }
 
 export function priorityForCall(call: EmergencyCallResponse): string {
-  const level = analysisForCall(call).priority_level || call.priority
-  if (!level || String(level).toLowerCase() === 'normal') return 'Not available'
-  return String(level).toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase())
+  const level = normalizeEmergencyCall(call).priority
+  if (!level || level === 'Normal') return 'Not available'
+  return level
 }
 
 export function locationForCall(call: EmergencyCallResponse): string {
-  if (typeof call.location_address === 'string' && call.location_address.trim()) return call.location_address
-  const lat = call.location?.latitude ?? call.latitude
-  const lng = call.location?.longitude ?? call.longitude
-  if (lat != null && lng != null) {
-    return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`
+  const normalized = normalizeEmergencyCall(call)
+  if (normalized.locationAddress) return normalized.locationAddress
+  if (normalized.latitude !== null && normalized.longitude !== null) {
+    return `${normalized.latitude.toFixed(5)}, ${normalized.longitude.toFixed(5)}`
   }
   return 'Not available'
 }
 
 export function rawTranscriptForCall(call: EmergencyCallResponse): string | null {
-  const text = typeof call.text_content === 'string' ? call.text_content.trim() : ''
-  return text || null
+  return normalizeEmergencyCall(call).textContent
 }
 
 export function cleanTranscriptForCall(call: EmergencyCallResponse): string | null {
-  const transcription = typeof call.transcription === 'string' ? call.transcription.trim() : ''
-  if (transcription) return transcription
-  return rawTranscriptForCall(call)
+  return normalizeEmergencyCall(call).cleanTranscript
 }
 
 export function transcriptForCall(call: EmergencyCallResponse): string | null {
-  return cleanTranscriptForCall(call)
+  const normalized = normalizeEmergencyCall(call)
+  return normalized.cleanTranscript || normalized.originalTranscript
 }
 
 export function toEmergencyCallRow(call: EmergencyCallResponse) {
@@ -124,7 +116,9 @@ export function toEmergencyCallRow(call: EmergencyCallResponse) {
     Moderate: { bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-600', border: 'border-l-green-600' },
     Low: { bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', border: 'border-l-blue-500' },
   }
-  const status = (call.status || 'Not available').replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+  const normalized = normalizeEmergencyCall(call)
+  const statusValue = typeof normalized.status === 'string' ? normalized.status : 'Not available'
+  const status = statusValue.replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase())
   const statusStyles: Record<string, { bg: string; text: string }> = {
     Analyzed: { bg: 'bg-green-100', text: 'text-green-800' },
     Received: { bg: 'bg-zinc-100', text: 'text-zinc-700' },
@@ -134,7 +128,7 @@ export function toEmergencyCallRow(call: EmergencyCallResponse) {
   }
   const style = priorityStyles[priority] || { bg: 'bg-zinc-100', text: 'text-zinc-700', dot: 'bg-zinc-500', border: 'border-l-transparent' }
   const statusStyle = statusStyles[status] || { bg: 'bg-zinc-100', text: 'text-zinc-700' }
-  const timestamp = call.created_at ? new Date(call.created_at) : null
+  const timestamp = normalized.createdAt ? new Date(normalized.createdAt) : null
   const elapsedMinutes = timestamp && !Number.isNaN(timestamp.getTime())
     ? Math.max(0, Math.floor((Date.now() - timestamp.getTime()) / 60000))
     : null
@@ -145,12 +139,10 @@ export function toEmergencyCallRow(call: EmergencyCallResponse) {
       : elapsedMinutes < 60
         ? `${elapsedMinutes}m ago`
         : `${Math.floor(elapsedMinutes / 60)}h ago`
-  const metadata = call.client_metadata || {}
-
   return {
     id: call.id,
-    caller_name: typeof metadata.caller_name === 'string' ? metadata.caller_name : 'Not available',
-    caller_phone: typeof metadata.caller_phone === 'string' ? metadata.caller_phone : 'Not available',
+    caller_name: normalized.callerName || 'Caller not identified',
+    caller_phone: normalized.callerPhone || 'Not provided',
     category: categoryForCall(call),
     priority_level: priority,
     priority_bg: style.bg,

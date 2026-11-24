@@ -21,16 +21,17 @@ import {
   MapPin,
   ChevronRight,
 } from 'lucide-react'
-import { getEmergencyAnalytics } from '@/api/emergencyApi'
+import { getAllEmergencies } from '@/api/emergencyApi'
 import Loading from '@/components/common/Loading'
 import ErrorMessage from '@/components/common/ErrorMessage'
+import { buildCallMetrics, safeChartData } from '@/lib/emergencyCallNormalizer'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function Dashboard() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['emergency-analytics-summary'],
-    queryFn: getEmergencyAnalytics,
+  const { data: calls = [], isLoading, error } = useQuery({
+    queryKey: ['emergency-calls', 'all'],
+    queryFn: getAllEmergencies,
     refetchInterval: 15000,
     staleTime: 10000,
   })
@@ -38,6 +39,7 @@ export default function Dashboard() {
   if (isLoading) return <Loading />
   if (error) return <ErrorMessage error={error} />
 
+  const metrics = buildCallMetrics(calls)
   const formatMetric = (value: number | null | undefined) =>
     value == null ? '—' : value.toLocaleString()
   const levelStyles: Record<string, { background: string; foreground: string; dot: string; score: string }> = {
@@ -46,59 +48,54 @@ export default function Dashboard() {
     Moderate: { background: 'bg-green-100 text-green-800', foreground: 'bg-green-600', dot: 'bg-green-600', score: '#16a34a' },
     Low: { background: 'bg-blue-100 text-blue-800', foreground: 'bg-blue-500', dot: 'bg-blue-500', score: '#3b82f6' },
   }
-  const maxSeverityCount = Math.max(1, ...data.severity_distribution.map((item: any) => item.count))
-  const severityDistribution = data.severity_distribution.map((item: any) => ({
+  const maxSeverityCount = Math.max(1, ...metrics.priorities.map((item: any) => item.count))
+  const severityDistribution = metrics.priorities.map((item: any) => ({
     ...item,
     color: levelStyles[item.level]?.score || '#71717a',
     width: `${(item.count / maxSeverityCount) * 100}%`,
   }))
-  const recentCalls = data.recent_calls.map((call: any) => {
-    const style = levelStyles[call.priority_level] || {
+  const recentCalls = metrics.recentCriticalCalls.map((call: any) => {
+    const style = levelStyles[call.priority] || {
       background: 'bg-zinc-100 text-zinc-700',
       dot: 'bg-zinc-500',
       score: '#71717a',
     }
-    const created = call.created_at ? new Date(call.created_at) : null
+    const created = call.createdAt ? new Date(call.createdAt) : null
     const elapsedMinutes = created && !Number.isNaN(created.getTime())
       ? Math.max(0, Math.floor((Date.now() - created.getTime()) / 60000))
       : null
     return {
       ...call,
-      caller_name: call.caller_name || 'Not available',
-      caller_phone: call.caller_phone || 'Not available',
+      caller_name: call.callerName || 'Caller not identified',
       time_ago: elapsedMinutes == null ? 'Not available' : elapsedMinutes < 1 ? 'Just now' : `${elapsedMinutes}m ago`,
-      priority_level: call.priority_level || 'Not available',
+      priority_level: call.priority || 'Not available',
+      category_label: call.category
+        ? call.category.replaceAll('_', ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase())
+        : 'Not reported',
       priority_color: style.background,
       dot_color: style.dot,
       score_color: style.score,
+      status_label: call.status
+        ? call.status.replaceAll('_', ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase())
+        : 'Not reported',
     }
   })
 
-  const callRateData = {
-    labels: data.call_rate_7days.labels,
-    datasets: [
-      {
-        label: 'Calls',
-        data: data.call_rate_7days.data,
-        backgroundColor: '#1a1a1a',
-        borderRadius: 3,
-        borderSkipped: false,
-      },
-    ],
-  }
+  const callRateData = safeChartData(metrics.callRate7Days.labels, metrics.callRate7Days.data, {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 3,
+    borderSkipped: false,
+  })
 
-  const callsCategoryData = {
-    labels: Object.keys(data.calls_by_category),
-    datasets: [
-      {
-        label: 'Calls',
-        data: Object.values(data.calls_by_category),
-        backgroundColor: ['#111111', '#333333', '#555555', '#777777', '#999999'],
-        borderRadius: 3,
-        borderSkipped: false,
-      },
-    ],
-  }
+  const callsCategoryData = safeChartData(
+    metrics.categories.map(([category]) => category.replaceAll('_', ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase())),
+    metrics.categories.map(([, count]) => count),
+    {
+      backgroundColor: metrics.categories.map((_, index) => ['#111111', '#333333', '#555555', '#777777', '#999999'][index % 5]),
+      borderRadius: 3,
+      borderSkipped: false,
+    },
+  )
 
   const chartOptions = {
     responsive: true,
@@ -126,7 +123,7 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Total Calls</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.total_calls)}</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.totalCalls)}</p>
           <p className="text-green-600 text-xs">Records stored in PostgreSQL</p>
         </div>
 
@@ -138,8 +135,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Critical</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.critical_calls)}</p>
-          <p className="text-red-600 text-xs">Based on backend priority analysis</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.criticalCalls)}</p>
+          <p className="text-red-600 text-xs">Based on persisted analysis priority</p>
         </div>
 
         {/* Card 3: Today's Calls */}
@@ -150,7 +147,7 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Today's Calls</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.todays_calls)}</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.todaysCalls)}</p>
           <p className="text-green-600 text-xs">Calls received today</p>
         </div>
 
@@ -162,8 +159,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Resolved</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.resolved)}</p>
-          <p className="text-green-600 text-xs">Records with resolved status</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.resolved)}</p>
+          <p className="text-green-600 text-xs">Calls with resolved or closed status</p>
         </div>
 
         {/* Card 5: Dispatched */}
@@ -174,8 +171,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Dispatched</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.dispatched)}</p>
-          <p className="text-red-600 text-xs">No persisted dispatch records available</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.dispatched)}</p>
+          <p className="text-zinc-500 text-xs">Only confirmed dispatch records are counted</p>
         </div>
 
         {/* Card 6: Avg Severity */}
@@ -185,9 +182,9 @@ export default function Dashboard() {
               <Activity className="w-4 h-4 text-white" />
             </div>
           </div>
-          <p className="text-xs text-zinc-500 uppercase mb-1">Avg Severity</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.average_severity)}</p>
-          <p className="text-zinc-500 text-xs">Mean of backend priority scores / 100</p>
+          <p className="text-xs text-zinc-500 uppercase mb-1">Avg Priority Score</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.averagePriorityScore)}</p>
+          <p className="text-zinc-500 text-xs">Mean of persisted priority scores / 100</p>
         </div>
 
         {/* Card 7: Pending */}
@@ -198,8 +195,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Pending</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.pending)}</p>
-          <p className="text-zinc-500 text-xs">Received or awaiting analysis</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.pending)}</p>
+          <p className="text-zinc-500 text-xs">Received, analyzing, or awaiting transcription</p>
         </div>
 
         {/* Card 8: Active Incidents */}
@@ -210,8 +207,8 @@ export default function Dashboard() {
             </div>
           </div>
           <p className="text-xs text-zinc-500 uppercase mb-1">Active Incidents</p>
-          <p className="text-3xl font-semibold mb-2">{formatMetric(data.active_incidents)}</p>
-          <p className="text-red-600 text-xs">No persisted incident records available</p>
+          <p className="text-3xl font-semibold mb-2">{formatMetric(metrics.activeIncidents)}</p>
+          <p className="text-zinc-500 text-xs">Separate active incident records are unavailable</p>
         </div>
       </div>
 
@@ -235,7 +232,9 @@ export default function Dashboard() {
             <p className="text-xs text-zinc-500 mt-1">Top 5 emergency types</p>
           </div>
           <div style={{ height: '180px', position: 'relative' }}>
-            <Bar data={callsCategoryData} options={chartOptions} />
+            {callsCategoryData.labels.length
+              ? <Bar data={callsCategoryData} options={chartOptions} />
+              : <div className="flex h-full items-center justify-center text-sm text-zinc-500">No analyzed categories are available.</div>}
           </div>
         </div>
       </div>
@@ -264,24 +263,21 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {recentCalls.map((call: any) => (
+                {recentCalls.length === 0 ? (
+                  <tr><td className="py-4 text-center text-sm text-zinc-500" colSpan={5}>No critical calls are available.</td></tr>
+                ) : recentCalls.map((call: any) => (
                   <tr
                     key={call.id}
                     className={`border-b border-zinc-100 ${
-                      call.priority_level === 'Critical'
-                        ? 'border-l-2 border-l-red-600'
-                        : call.priority_level === 'Very High'
-                        ? 'border-l-2 border-l-orange-500'
-                        : ''
+                      call.priority_level === 'Critical' ? 'border-l-2 border-l-red-600' : ''
                     }`}
                   >
                     <td className="py-2 px-2">
                       <div>
                         <div className="font-medium text-sm">{call.caller_name}</div>
-                        <div className="text-xs text-zinc-500">{call.caller_phone}</div>
                       </div>
                     </td>
-                    <td className="py-2 px-2 text-sm">{call.category}</td>
+                    <td className="py-2 px-2 text-sm">{call.category_label}</td>
                     <td className="py-2 px-2">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${call.priority_color}`}
@@ -292,12 +288,12 @@ export default function Dashboard() {
                     </td>
                     <td className="py-2 px-2">
                       <div>
-                        <span className="text-sm font-medium">{formatMetric(call.final_score)}</span>
+                        <span className="text-sm font-medium">{formatMetric(call.priorityScore)}</span>
                         <div className="w-10 h-0.5 mt-1 rounded-full bg-zinc-200">
                           <div
                             className="h-0.5 rounded-full"
                             style={{
-                              width: call.final_score == null ? '0%' : `${call.final_score}%`,
+                              width: call.priorityScore == null ? '0%' : `${Math.max(0, Math.min(100, call.priorityScore))}%`,
                               background: call.score_color,
                             }}
                           />
@@ -306,7 +302,7 @@ export default function Dashboard() {
                     </td>
                     <td className="py-2 px-2">
                       <span className="text-xs px-2 py-0.5 rounded bg-zinc-100 text-zinc-600">
-                        {call.status}
+                        {call.status_label}
                       </span>
                     </td>
                   </tr>
@@ -341,7 +337,7 @@ export default function Dashboard() {
           <div className="border-t border-zinc-200 pt-3 mt-3">
             <p className="text-xs text-zinc-500 mb-2">Emergency channels</p>
             <div className="grid grid-cols-2 gap-2">
-              {data.channels.length > 0 ? data.channels.slice(0, 4).map((channel: any) => (
+              {metrics.channels.length > 0 ? metrics.channels.slice(0, 4).map((channel: any) => (
                 <div key={channel.source} className="bg-zinc-50 rounded-md p-2">
                   <div className="text-xs text-zinc-500">{channel.source}</div>
                   <div className="text-base font-semibold">{channel.count} calls</div>

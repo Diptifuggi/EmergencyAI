@@ -25,6 +25,7 @@ class EmergencyCallTextCreate(BaseModel):
     longitude: float | None = Field(default=None, ge=-180, le=180)
     location_accuracy: float | None = Field(default=None, ge=0)
     location_timestamp: datetime | None = None
+    location_address: str | None = Field(default=None, max_length=1000)
     source: str = Field(default="flutter", min_length=1, max_length=50)
     priority: str = Field(default="normal", min_length=1, max_length=35)
     client_metadata: dict[str, Any] | None = None
@@ -48,6 +49,7 @@ class EmergencyCallManualCreate(BaseModel):
     started_at: datetime | None = None
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    location_address: str | None = Field(default=None, max_length=1000)
     source: str = Field(default="react_operator", min_length=1, max_length=50)
 
     @field_validator("caller_name", "caller_phone", "source")
@@ -73,9 +75,17 @@ class EmergencyCallUpdate(BaseModel):
     longitude: float | None = Field(default=None, ge=-180, le=180)
     location_accuracy: float | None = Field(default=None, ge=0)
     location_timestamp: datetime | None = None
+    location_address: str | None = Field(default=None, max_length=1000)
     client_metadata: dict[str, Any] | None = None
 
-    @field_validator("transcription", "text_content", "status", "priority", "language")
+    @field_validator(
+        "transcription",
+        "text_content",
+        "status",
+        "priority",
+        "language",
+        "location_address",
+    )
     @classmethod
     def strip_optional(cls, value: str | None) -> str | None:
         if value is None:
@@ -93,6 +103,7 @@ class LocationResponse(BaseModel):
     captured_at: datetime | None = None
     location_available: bool
     status: str
+    address_status: str = "unavailable"
     reason: str | None = None
 
 
@@ -120,6 +131,7 @@ class EmergencyCallOut(BaseModel):
     location_accuracy: float | None = None
     location_timestamp: datetime | None = None
     location_address: str | None = None
+    location_address_status: str = "unavailable"
     location_status: str = "unavailable"
     map_snapshot_available: bool = False
     map_snapshot_filename: str | None = None
@@ -168,15 +180,14 @@ class EmergencyCallOut(BaseModel):
                     "captured_at": ts,
                     "location_available": True,
                     "status": location_status,
+                    "address_status": data.get("location_address_status", "unavailable"),
                 }
             else:
                 reason = meta.get("location_error") if isinstance(meta, dict) else None
-                if not reason:
-                    reason = "Location permission denied"
                 data["location"] = {
                     "location_available": False,
                     "status": location_status,
-                    "reason": reason,
+                    "reason": reason if isinstance(reason, str) and reason.strip() else None,
                 }
         else:
             # Check if already populated
@@ -199,15 +210,14 @@ class EmergencyCallOut(BaseModel):
                     captured_at=ts,
                     location_available=True,
                     status=location_status,
+                    address_status=getattr(data, "location_address_status", "unavailable"),
                 )
             else:
                 reason = meta.get("location_error") if isinstance(meta, dict) else None
-                if not reason:
-                    reason = "Location permission denied"
                 data.location = LocationResponse(
                     location_available=False,
                     status=location_status,
-                    reason=reason,
+                    reason=reason if isinstance(reason, str) and reason.strip() else None,
                 )
         return data
 

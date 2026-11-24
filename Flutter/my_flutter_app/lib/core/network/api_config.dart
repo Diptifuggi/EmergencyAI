@@ -27,4 +27,6 @@ class ApiConfig {
 
   static const Duration requestTimeout = Duration(seconds: 30);
   static const Duration uploadTimeout = Duration(seconds: 90);
+  static const Duration analysisPollInterval = Duration(seconds: 2);
+  static const Duration analysisPollTimeout = Duration(seconds: 150);
 }

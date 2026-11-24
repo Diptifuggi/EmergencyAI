@@ -9,11 +9,23 @@ regional dialects, slang, and speech-recognition variants evolve continually.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from functools import lru_cache
+import re
+from dataclasses import dataclass, replace
 from typing import Iterable
 
 LANGUAGES = (
     "english", "hindi", "gujarati", "marathi", "romanized", "code_mixed", "stt_variants"
+)
+_W = r"[\w\u0900-\u097F\u0A80-\u0AFF]"
+_CLAUSE_BREAK = re.compile(
+    r"[,.;!?।]|\b(?:and|but|ane|aur)\b|और|लेकिन|आणि|पण|અને|પણ",
+    re.IGNORECASE,
+)
+_NEGATION_WORDS = (
+    "not", "no", "never", "didn't", "did not", "wasn't", "was not",
+    "without", "nobody", "no one", "नहीं", "नही", "कोई नहीं", "न कोई",
+    "નથી", "નહીં", "નાહી", "नाही", "nahi", "nahin", "nathi",
 )
 
 
@@ -89,11 +101,11 @@ LEXICON: dict[str, EmergencyLexicon] = {
     ),
     "medical": EmergencyLexicon(
         english=("medical emergency", "medical help", "medical assistance", "ambulance needed", "ambulance required", "person unconscious", "unconscious", "collapsed", "not breathing", "difficulty breathing", "breathing problem", "breathlessness", "chest pain", "heart attack", "cardiac arrest", "stroke", "seizure", "fits", "convulsion", "fainted", "fainting", "severe pain", "heavy bleeding", "bleeding", "blood loss", "serious injury", "critical condition", "vomiting blood", "poisoning", "overdose", "burn injury", "electric shock", "snake bite", "dog bite", "animal bite", "allergic reaction", "pregnancy emergency", "pregnant woman", "delivery emergency", "child emergency", "baby emergency", "newborn emergency", "elderly person emergency"),
-        hindi=("मेडिकल इमरजेंसी", "चिकित्सा सहायता", "डॉक्टर चाहिए", "एम्बुलेंस चाहिए", "एम्बुलेंस भेजो", "एम्बुलेंस की जरूरत है", "बेहोश", "बेहोश हो गया", "सांस नहीं ले रहा", "सांस नहीं आ रही", "सांस लेने में दिक्कत", "दम घुट रहा है", "सीने में दर्द", "दिल का दौरा", "हार्ट अटैक", "दिल रुक गया", "लकवा", "स्ट्रोक", "दौरा पड़ा", "मिर्गी का दौरा", "गिर गया", "बेहोश होकर गिर गया", "बहुत दर्द", "बहुत ज्यादा खून बह रहा", "खून बह रहा", "खून नहीं रुक रहा", "गंभीर चोट", "गंभीर हालत", "जहर खा लिया", "जहर पी लिया", "ओवरडोज", "सांप ने काट लिया", "कुत्ते ने काट लिया", "जानवर ने काट लिया", "बिजली का झटका", "जल गया", "जलने की चोट", "गर्भवती महिला", "डिलीवरी की समस्या", "बच्चा बीमार है", "बच्चा बेहोश है", "बुजुर्ग की तबीयत खराब"),
+        hindi=("मेडिकल इमरजेंसी", "चिकित्सा सहायता", "डॉक्टर चाहिए", "एम्बुलेंस चाहिए", "एम्बुलेंस भेजो", "एम्बुलेंस की जरूरत है", "बेहोश", "बेहोश हो गया", "सांस नहीं ले रहा", "सांस नहीं आ रही", "सांस लेने में दिक्कत", "दम घुट रहा है", "सीने में दर्द", "छाती में दर्द", "चेस्ट में दर्द", "दिल का दौरा", "हार्ट अटैक", "दिल रुक गया", "लकवा", "स्ट्रोक", "दौरा पड़ा", "मिर्गी का दौरा", "गिर गया", "बेहोश होकर गिर गया", "बहुत दर्द", "बहुत ज्यादा खून बह रहा", "खून बह रहा", "खून नहीं रुक रहा", "गंभीर चोट", "गंभीर हालत", "जहर खा लिया", "जहर पी लिया", "ओवरडोज", "सांप ने काट लिया", "कुत्ते ने काट लिया", "जानवर ने काट लिया", "बिजली का झटका", "जल गया", "जलने की चोट", "गर्भवती महिला", "डिलीवरी की समस्या", "बच्चा बीमार है", "बच्चा बेहोश है", "बुजुर्ग की तबीयत खराब"),
         gujarati=("મેડિકલ ઇમરજન્સી", "તબીબી મદદ", "એમ્બ્યુલન્સ જોઈએ", "એમ્બ્યુલન્સ મોકલો", "એમ્બ્યુલન્સની જરૂર છે", "બેભાન", "બેભાન થઈ ગયો", "શ્વાસ નથી લઈ રહ્યો", "શ્વાસ લેવામાં તકલીફ", "છાતીમાં દુખાવો", "હાર્ટ એટેક", "સ્ટ્રોક", "આંચકો", "લોહી વહી રહ્યું છે", "ખૂબ લોહી નીકળે છે", "લોહી બંધ થતું નથી", "ગંભીર ઈજા", "ઝેર પી લીધું", "ઓવરડોઝ", "સાપે ડંખ માર્યો", "કૂતરાએ કરડ્યો", "વીજળીનો ઝટકો", "દાઝી ગયો", "સગર્ભા મહિલા", "ડિલિવરીની ઇમરજન્સી", "બાળકની તબિયત ખરાબ", "વૃદ્ધની તબિયત ખરાબ"),
         marathi=("वैद्यकीय आणीबाणी", "मेडिकल इमर्जन्सी", "वैद्यकीय मदत", "रुग्णवाहिका हवी", "रुग्णवाहिका पाठवा", "रुग्णवाहिकेची गरज आहे", "बेशुद्ध", "बेशुद्ध झाला", "श्वास घेत नाही", "श्वास घेण्यास त्रास", "श्वास घेता येत नाही", "छातीत दुखत आहे", "हृदयविकाराचा झटका", "हार्ट अटॅक", "स्ट्रोक", "झटका आला", "फिट आली", "बेशुद्ध पडला", "खूप वेदना", "खूप रक्त वाहत आहे", "रक्तस्त्राव", "रक्त थांबत नाही", "गंभीर दुखापत", "गंभीर अवस्था", "विष घेतले", "ओव्हरडोस", "साप चावला", "कुत्र्याने चावले", "वीज लागली", "भाजले", "गर्भवती महिला", "प्रसूतीची आणीबाणी", "बाळ आजारी आहे", "वृद्ध व्यक्तीची तब्येत खराब"),
-        romanized=("behosh", "behosh ho gaya", "saans nahi aa rahi", "saans lene mein dikkat", "seene mein dard", "dil ka daura", "ambulance chahiye", "ambulance bhejo", "khoon beh raha", "zehar kha liya", "saanp ne kaata", "bachcha behosh"),
-        code_mixed=("chest mein pain", "breathing mein problem", "ambulance bhejo", "heart attack hua", "medical help chahiye", "saans nahi le raha", "patient critical hai"),
+        romanized=("behosh", "behosh ho gaya", "saans nahi aa rahi", "saans lene mein dikkat", "seene mein dard", "chhati mein dard", "dil ka daura", "ambulance chahiye", "ambulance bhejo", "khoon beh raha", "zehar kha liya", "saanp ne kaata", "bachcha behosh"),
+        code_mixed=("chest mein pain", "chest mein dard", "चेस्ट में दर्द", "breathing mein problem", "ambulance bhejo", "heart attack hua", "medical help chahiye", "saans nahi le raha", "patient critical hai"),
         stt_variants=("ambalance", "ambulans", "ambyulance", "behos", "sans nahi", "saans nhi", "breth problem", "heartatak"),
     ),
     "police_crime": EmergencyLexicon(
@@ -139,7 +151,7 @@ LEXICON: dict[str, EmergencyLexicon] = {
         marathi=("भूकंप", "भूकंप झाला", "पूर", "पूर आला आहे", "पाणी भरले", "पाणी वाढत आहे", "अचानक पूर", "मुसळधार पाऊस", "ढगफुटी", "भूस्खलन", "दरड कोसळली", "चक्रीवादळ", "वादळ", "वीज पडली", "त्सुनामी", "इमारत कोसळली", "पूल कोसळला", "रस्ता वाहून गेला", "ढिगाऱ्यात अडकले"),
         romanized=("bhukamp", "baadh", "paani bhar gaya", "baarish", "baadal phat gaya", "bhooskhalan", "toofan", "bijli gir gayi", "pul gir gaya"),
         code_mixed=("flood aa gaya", "heavy rain se road wash", "building gir gayi", "earthquake aaya", "paani badh raha"),
-        stt_variants=("bhukam", "baad", "land slide", "cloud burst", "cyclon"),
+        stt_variants=("bhukam", "baadh", "land slide", "cloud burst", "cyclon"),
     ),
     "structural_collapse": EmergencyLexicon(
         english=("building collapse", "building collapsed", "house collapsed", "wall collapsed", "roof collapsed", "ceiling collapsed", "bridge collapse", "tower collapse", "structure collapse", "building falling", "building damaged", "cracks in building", "major structural damage", "trapped under rubble", "buried under rubble"),
@@ -199,7 +211,7 @@ LEXICON: dict[str, EmergencyLexicon] = {
         english=("snake bite", "snake attack", "dog bite", "dog attack", "animal attack", "wild animal attack", "leopard attack", "tiger attack", "elephant attack", "wild boar attack", "monkey attack", "bee attack", "wasp attack"),
         hindi=("सांप ने काट लिया", "सांप का हमला", "सांप दिखा", "कुत्ते ने काट लिया", "कुत्ते का हमला", "जानवर ने हमला किया", "जंगली जानवर का हमला", "तेंदुए का हमला", "बाघ का हमला", "हाथी का हमला", "बंदर का हमला", "मधुमक्खियों का हमला"),
         gujarati=("સાપે ડંખ માર્યો", "સાપનો હુમલો", "કૂતરાએ કરડ્યું", "કૂતરાનો હુમલો", "પ્રાણીનો હુમલો", "જંગલી પ્રાણીનો હુમલો", "દીપડાનો હુમલો", "વાઘનો હુમલો", "હાથીનો હુમલો", "વાંદરાનો હુમલો", "મધમાખીનો હુમલો"),
-        marathi=("साप चावला", "सापाचा हल्ला", "कुत्र्याने चावले", "कुत्र्याचा हल्ला", "प्राण्याचा हल्ला", "वन्य प्राण्याचा हल्ला", "बिबट्याचा हल्ला", "वाघाचा हल्ला", "हत्तीचा हल्ला", "माकडाचा हल्ला", "मधमाशांचा हल्ला"),
+        marathi=("साप चावला", "सापाचा हल्ला", "कुत्र्याने चावले", "कुत्र्याने चावा घेतला", "कुत्र्याचा हल्ला", "प्राण्याचा हल्ला", "वन्य प्राण्याचा हल्ला", "बिबट्याचा हल्ला", "वाघाचा हल्ला", "हत्तीचा हल्ला", "माकडाचा हल्ला", "मधमाशांचा हल्ला"),
         romanized=("saanp ne kaata", "saap ne kata", "kutte ne kaata", "dog bite", "jaanwar ka hamla", "snake attack"),
         code_mixed=("snake ne bite kiya", "dog attack hua", "animal attack ho raha", "saanp ka bite"),
         stt_variants=("sanp", "samp bite", "kutta kata", "animal atak"),
@@ -207,7 +219,7 @@ LEXICON: dict[str, EmergencyLexicon] = {
     "cyber_crime": EmergencyLexicon(
         english=("cyber attack", "cyber crime", "online fraud", "bank fraud", "upi fraud", "upi scam", "otp fraud", "otp scam", "online scam", "account hacked", "phone hacked", "email hacked", "identity theft", "money stolen online", "financial fraud", "digital fraud", "phishing", "ransomware", "blackmail online"),
         hindi=("साइबर क्राइम", "साइबर अपराध", "ऑनलाइन ठगी", "ऑनलाइन धोखाधड़ी", "बैंक फ्रॉड", "बैंक से पैसे निकल गए", "यूपीआई फ्रॉड", "यूपीआई स्कैम", "ओटीपी फ्रॉड", "ओटीपी स्कैम", "ऑनलाइन स्कैम", "अकाउंट हैक हो गया", "फोन हैक हो गया", "ईमेल हैक हो गया", "पैसे ऑनलाइन चोरी हो गए", "साइबर ठगी", "फिशिंग", "ऑनलाइन ब्लैकमेल"),
-        gujarati=("સાયબર ક્રાઇમ", "સાયબર ગુનો", "ઓનલાઇન છેતરપિંડી", "બેંક ફ્રોડ", "upi ફ્રોડ", "upi સ્કેમ", "otp ફ્રોડ", "ઓનલાઇન સ્કેમ", "એકાઉન્ટ હેક થઈ ગયું", "ફોન હેક થઈ ગયો", "પૈસા ઓનલાઇન ચોરાઈ ગયા", "સાયબર છેતરપિંડી"),
+        gujarati=("સાયબર ક્રાઇમ", "સાયબર ગુનો", "ઓનલાઇન છેતરપિંડી", "ઓનલાઇન છેતરપિંડીમાં", "ઓનલાઈન છેતરપિંડી", "ઓનલાઈન છેતરપિંડીમાં", "બેંક ફ્રોડ", "upi ફ્રોડ", "upi સ્કેમ", "otp ફ્રોડ", "ઓનલાઇન સ્કેમ", "એકાઉન્ટ હેક થઈ ગયું", "ફોન હેક થઈ ગયો", "પૈસા ઓનલાઇન ચોરાઈ ગયા", "સાયબર છેતરપિંડી"),
         marathi=("सायबर क्राईम", "सायबर गुन्हा", "ऑनलाइन फसवणूक", "ऑनलाइन फसवणुकीत", "बँक फ्रॉड", "upi फ्रॉड", "upi स्कॅम", "otp फ्रॉड", "ऑनलाइन स्कॅम", "अकाउंट हॅक झाले", "फोन हॅक झाला", "ऑनलाइन पैसे चोरीला गेले", "सायबर फसवणूक"),
         romanized=("cyber crime", "online thagi", "online fraud", "upi fraud", "otp scam", "account hack", "paise chori online"),
         code_mixed=("online paise chori", "bank account hack ho gaya", "upi fraud hua", "phone hack hai", "cyber complaint"),
@@ -215,38 +227,96 @@ LEXICON: dict[str, EmergencyLexicon] = {
     ),
     "crowd_emergency": EmergencyLexicon(
         english=("stampede", "crowd crush", "crowd panic", "crowd emergency", "large crowd", "people running", "mass casualty", "mass injury", "public disturbance", "riot", "violent protest", "crowd fighting"),
-        hindi=("भगदड़", "भगदड़ मच गई", "भीड़ में भगदड़", "भीड़ कुचल रही है", "बहुत भीड़", "भीड़ बेकाबू", "लोग भाग रहे हैं", "भीड़ में लोग फंसे", "सामूहिक चोट", "कई लोग घायल", "दंगा", "हिंसक प्रदर्शन", "भीड़ में मारपीट"),
-        gujarati=("નાસભાગ", "નાસભાગ મચી ગઈ", "ભીડમાં નાસભાગ", "ખૂબ મોટી ભીડ", "ભીડ બેકાબૂ", "લોકો ભાગી રહ્યા છે", "ભીડમાં લોકો ફસાયા", "ઘણા લોકો ઘાયલ", "તોફાન", "હિંસક વિરોધ"),
-        marathi=("चेंगराचेंगरी", "चेंगराचेंगरी झाली", "गर्दीत चेंगराचेंगरी", "मोठी गर्दी", "गर्दी नियंत्रणाबाहेर", "लोक पळत आहेत", "गर्दीत लोक अडकले", "अनेक जण जखमी", "दंगल", "हिंसक आंदोलन"),
+        hindi=("भगदड़", "भगदड़ मच गई", "भीड़ में भगदड़", "भीड़ कुचल रही है", "बहुत भीड़", "भीड़ बेकाबू", "लोग भाग रहे हैं", "भीड़ में लोग फंसे", "सामूहिक चोट", "दंगा", "हिंसक प्रदर्शन", "भीड़ में मारपीट"),
+        gujarati=("નાસભાગ", "નાસભાગ મચી ગઈ", "ભીડમાં નાસભાગ", "ખૂબ મોટી ભીડ", "ભીડ બેકાબૂ", "લોકો ભાગી રહ્યા છે", "ભીડમાં લોકો ફસાયા", "તોફાન", "હિંસક વિરોધ"),
+        marathi=("चेंगराचेंगरी", "चेंगराचेंगरी झाली", "गर्दीत चेंगराचेंगरी", "मोठी गर्दी", "गर्दी नियंत्रणाबाहेर", "लोक पळत आहेत", "गर्दीत लोक अडकले", "दंगल", "हिंसक आंदोलन"),
         romanized=("bhagdad", "bheed mein bhagdad", "bheed bekabu", "log bhaag rahe", "stampede", "danga"),
         code_mixed=("crowd bahut hai", "bheed mein people trapped", "stampede ho gaya", "public disturbance hai"),
         stt_variants=("stampid", "bhagdar", "bheed crush", "crowd panik"),
     ),
     "self_harm_crisis": EmergencyLexicon(
-        english=("suicide", "suicidal", "kill myself", "want to die", "going to die", "self harm", "harm myself", "attempted suicide", "suicide attempt", "person trying to kill themselves"),
-        hindi=("आत्महत्या", "आत्महत्या करने वाला", "मैं मरना चाहता हूं", "मैं मरना चाहती हूं", "मैं खुद को मारना चाहता हूं", "मैं खुद को मारना चाहती हूं", "खुद को नुकसान पहुंचाना", "जान देने की कोशिश", "आत्महत्या की कोशिश", "खुद को मारने की कोशिश"),
-        gujarati=("આત્મહત્યા", "મારે મરી જવું છે", "હું મારી જાતને મારી નાખીશ", "પોતાને નુકસાન પહોંચાડવું", "આત્મહત્યાનો પ્રયાસ", "પોતાને મારી નાખવાની કોશિશ"),
-        marathi=("आत्महत्या", "मला मरायचे आहे", "मी स्वतःला मारून घेईन", "स्वतःला इजा करणे", "आत्महत्येचा प्रयत्न", "स्वतःला मारण्याचा प्रयत्न"),
-        romanized=("aatmahatya", "marna chahta", "marna chahti", "khud ko maar dunga", "khud ko nuksan", "suicide karunga"),
-        code_mixed=("I want marna", "khud ko harm karunga", "suicide karne wala", "self harm karna hai"),
+        english=("suicide", "suicidal", "kill myself", "want to die", "going to die", "self harm", "harm myself", "attempted suicide", "suicide attempt", "person trying to kill themselves", "threatening to jump from the roof", "threatening to jump from a roof"),
+        hindi=("आत्महत्या", "आत्महत्या करने वाला", "मैं मरना चाहता हूं", "मैं मरना चाहती हूं", "मैं खुद को मारना चाहता हूं", "मैं खुद को मारना चाहती हूं", "खुद को नुकसान पहुंचाना", "जान देने की कोशिश", "आत्महत्या की कोशिश", "खुद को मारने की कोशिश", "छत से कूदने की धमकी"),
+        gujarati=("આત્મહત્યા", "મારે મરી જવું છે", "હું મારી જાતને મારી નાખીશ", "પોતાને નુકસાન પહોંચાડવું", "આત્મહત્યાનો પ્રયાસ", "પોતાને મારી નાખવાની કોશિશ", "છત પરથી કૂદવાની ધમકી"),
+        marathi=("आत्महत्या", "मला मरायचे आहे", "मी स्वतःला मारून घेईन", "स्वतःला इजा करणे", "आत्महत्येचा प्रयत्न", "स्वतःला मारण्याचा प्रयत्न", "छतावरून उडी मारण्याची धमकी"),
+        romanized=("aatmahatya", "marna chahta", "marna chahti", "khud ko maar dunga", "khud ko nuksan", "suicide karunga", "chhat se kudne ki dhamki"),
+        code_mixed=("I want marna", "khud ko harm karunga", "suicide karne wala", "self harm karna hai", "chhat se kudne ki dhamki de raha"),
         stt_variants=("suicid", "self harm", "marna he", "atmahatya", "khudko maar"),
+    ),
+    "injury": EmergencyLexicon(
+        english=("injury", "injuries", "injured", "wounded", "hurt", "fracture", "broken bone", "burn injury", "casualty", "casualties"),
+        hindi=("चोट", "चोट लगी", "घायल", "जख्मी", "हड्डी टूट", "फ्रैक्चर", "जल गया", "जल गई"),
+        gujarati=("ઇજા", "ઇજા થઈ", "ઘાયલ", "જખ્મી", "હાડકું તૂટ્યું", "ફ્રેક્ચર", "દાઝી ગયા"),
+        marathi=("इजा", "जखमी", "दुखापत", "हाड मोडले", "फ्रॅक्चर", "भाजले"),
+        romanized=("chot lagi", "ghayal", "zakhmi", "haddi tuti", "fracture"),
+        code_mixed=("injury hui", "hurt ho gaya", "bone fracture", "burn injury"),
+        stt_variants=("injurd", "ghayal hai", "jakhmi", "chot lagi hai"),
+    ),
+    "bleeding": EmergencyLexicon(
+        english=("bleeding", "blood loss", "blood is flowing", "heavy bleeding", "severe bleeding", "blood pouring"),
+        hindi=("खून बह रहा", "खून बहना", "खून निकल रहा", "भारी रक्तस्राव", "रक्तस्राव"),
+        gujarati=("લોહી વહી રહ્યું", "લોહી નીકળી રહ્યું", "ખૂબ લોહી", "રક્તસ્રાવ"),
+        marathi=("रक्त वाहत", "रक्तस्राव", "खूप रक्त", "रक्त येत"),
+        romanized=("khoon beh raha", "khoon nikal raha", "bahut khoon", "bleeding ho rahi"),
+        code_mixed=("heavy bleeding", "blood aa raha hai"),
+        stt_variants=("bleedin", "khoon beh rha", "blood loss"),
+    ),
+    "unconscious": EmergencyLexicon(
+        english=("unconscious", "passed out", "fainted", "not responding", "not waking up"),
+        hindi=("बेहोश", "होश नहीं", "जवाब नहीं दे रहे", "जवाब नहीं दे रही"),
+        gujarati=("બેભાન", "ભાન નથી", "જવાબ આપતા નથી", "જવાબ આપતી નથી"),
+        marathi=("बेशुद्ध", "शुद्धीत नाही", "उत्तर देत नाही", "शुद्ध हरपली"),
+        romanized=("behosh", "hosh nahi", "jawab nahi de raha"),
+        code_mixed=("unconscious hai", "not responding"),
+        stt_variants=("behos", "behosh hai", "fainted"),
     ),
 }
 
 # Existing deterministic flags are intentionally narrower than the public
 # domains.  Several domains contribute evidence to one established flag while
 # preserving the original schema and policy layer.
+LEXICON["road_accident"] = replace(
+    LEXICON["road_accident"],
+    hindi=(*LEXICON["road_accident"].hindi, "एक्सिडेंट", "एक्सीडेंट", "टक्कर मारी", "गाड़ी ने उड़ा दिया", "कुचल दिया", "बाइक स्लिप"),
+    gujarati=(*LEXICON["road_accident"].gujarati, "એક્સિડન્ટ", "અકસ્મત", "અકસમાત", "ટક્કર મારી", "બાઇક સ્લિપ"),
+    marathi=(*LEXICON["road_accident"].marathi, "एक्सिडेंट", "टक्कर मारली", "गाडीने उडवले", "चिरडले", "बाईक घसरली"),
+    romanized=(*LEXICON["road_accident"].romanized, "accident ho gaya", "takkar maari", "gaadi ne uda diya", "kuchal diya", "bike slip"),
+)
+LEXICON["medical"] = replace(
+    LEXICON["medical"],
+    hindi=(*LEXICON["medical"].hindi, "हार्ट अटैक", "एम्बुलेंस", "ऐम्बुलेंस", "सांस नहीं"),
+    gujarati=(*LEXICON["medical"].gujarati, "હાર્ટ એટેક", "એમ્બ્યુલન્સ", "શ્વાસ નથી"),
+    marathi=(*LEXICON["medical"].marathi, "हार्ट अटॅक", "रुग्णवाहिका", "श्वास घेत नाही"),
+    romanized=(*LEXICON["medical"].romanized, "behosh", "saans nahi", "sans nahi"),
+)
+LEXICON["fire"] = replace(
+    LEXICON["fire"],
+    hindi=(*LEXICON["fire"].hindi, "फायर ब्रिगेड", "आग लग गई"),
+    gujarati=(*LEXICON["fire"].gujarati, "ફાયર બ્રિગેડ", "આગ લાગી ગઈ"),
+    marathi=(*LEXICON["fire"].marathi, "फायर ब्रिगेड", "आग लागली"),
+    romanized=(*LEXICON["fire"].romanized, "aag lag gayi"),
+)
+LEXICON["gas_lpg"] = replace(
+    LEXICON["gas_lpg"],
+    romanized=(*LEXICON["gas_lpg"].romanized, "cylinder phat gaya"),
+)
+LEXICON["police_crime"] = replace(
+    LEXICON["police_crime"],
+    romanized=(*LEXICON["police_crime"].romanized, "chori ho rahi hai", "chain snatching"),
+)
+
+
 EVIDENCE_FLAG_DOMAINS: dict[str, tuple[str, ...]] = {
-    "fire": ("fire", "electrical", "structural_collapse"),
-    "explosion": ("explosion", "electrical"),
+    "fire": ("fire",),
+    "explosion": ("explosion",),
     "lpg": ("gas_lpg",),
     "accident": ("road_accident", "railway"),
     "road": ("road_accident", "traffic_obstruction"),
     "railway": ("railway",),
     "medical": ("medical", "animal_attack", "electrical", "drowning", "self_harm_crisis"),
-    "injury": ("medical", "animal_attack", "crowd_emergency"),
-    "bleeding": ("medical",),
-    "unconscious": ("medical",),
+    "injury": ("injury", "animal_attack", "crowd_emergency"),
+    "bleeding": ("bleeding",),
+    "unconscious": ("unconscious",),
     "trapped": ("rescue", "structural_collapse", "natural_disaster", "crowd_emergency"),
     "rescue": ("rescue", "drowning", "structural_collapse", "natural_disaster"),
     "police": ("police_crime", "women_safety", "domestic_violence", "missing_person", "crowd_emergency"),
@@ -261,16 +331,25 @@ EVIDENCE_FLAG_DOMAINS: dict[str, tuple[str, ...]] = {
 }
 
 
+@lru_cache(maxsize=4096)
+def _term_pattern(term: str) -> re.Pattern[str]:
+    words = r"\s+".join(re.escape(word) for word in term.split())
+    return re.compile(rf"(?<!{_W}){words}(?!{_W})", re.IGNORECASE)
+
+
 def _affirmed_term(text: str, term: str) -> bool:
     """Match a reviewed term; do not fuzzy-match arbitrary user text."""
-    start = text.find(term)
-    while start >= 0:
-        before = text[start - 1] if start else " "
-        after_index = start + len(term)
-        after = text[after_index] if after_index < len(text) else " "
-        if (not term[0].isalnum() or not before.isalnum()) and (not term[-1].isalnum() or not after.isalnum()):
-            return True
-        start = text.find(term, start + 1)
+    pattern = _term_pattern(term)
+    for clause in _CLAUSE_BREAK.split(text):
+        for match in pattern.finditer(clause):
+            before, after = clause[:match.start()], clause[match.end():]
+            negated = any(
+                re.search(rf"(?<!{_W}){re.escape(marker)}(?!{_W})", before[-48:], re.IGNORECASE)
+                or re.search(rf"(?<!{_W}){re.escape(marker)}(?!{_W})", after[:32], re.IGNORECASE)
+                for marker in _NEGATION_WORDS
+            )
+            if not negated:
+                return True
     return False
 
 

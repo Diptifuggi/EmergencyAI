@@ -50,12 +50,13 @@ export default function Sidebar() {
 
   // collapsed state persisted
   const [collapsed, setCollapsed] = React.useState<boolean>(() => {
+    if (window.innerWidth >= 1024) return false
     try { return localStorage.getItem('sidebar:collapsed') === 'true' } catch { return false }
   })
   const [mobileOpen, setMobileOpen] = React.useState<boolean>(false)
 
   React.useEffect(()=>{
-    function onResize(){ if (window.innerWidth < 1280) setCollapsed(true) }
+    function onResize(){ setCollapsed(window.innerWidth < 1024) }
     function onToggle(){ setMobileOpen(s => !s) }
     window.addEventListener('resize', onResize)
     window.addEventListener('toggleMobileSidebar', onToggle)
@@ -65,10 +66,10 @@ export default function Sidebar() {
 
   React.useEffect(()=>{ try { localStorage.setItem('sidebar:collapsed', collapsed ? 'true' : 'false') } catch {} }, [collapsed])
 
-  const widthStyle = collapsed ? 48 : 240
+  const widthClass = collapsed ? 'w-12 min-w-12' : 'w-64 min-w-64'
 
   const content = (
-    <div className={`flex flex-col bg-[#111111] text-white ${collapsed ? 'text-center' : ''}`} style={{width:widthStyle, minWidth:widthStyle, borderRight: '1px solid #222222'}}>
+    <div className={`flex h-full min-h-0 flex-none flex-col overflow-x-hidden bg-[#111111] text-white ${widthClass} ${collapsed ? 'text-center' : ''}`} style={{borderRight: '1px solid #222222'}}>
       <div className="h-14 flex items-center px-4 border-b border-white/5">
         <div>
           <div className="text-white font-bold">EmergencyIQ</div>
@@ -86,13 +87,13 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-3 overflow-auto">
+      <nav className="flex-1 px-2 py-3 overflow-y-auto overflow-x-hidden">
         {NAV_ITEMS.map(item => (
           <NavLink key={item.to} to={item.to} className={({isActive}) =>
             `flex items-center h-11 px-4 my-2 rounded-xl gap-3 transition-colors duration-200 ${isActive ? 'bg-[#1E1E1E] text-white border-l-2 border-white pl-3' : 'text-white/80 hover:bg-[#202020]'}`
           }>
-            <item.Icon className="w-5 h-5" title={item.label} />
-            {!collapsed && <span className="text-sm">{item.label}</span>}
+            <item.Icon className="w-5 h-5 shrink-0" title={item.label} />
+            {!collapsed && <span className="min-w-0 truncate text-sm">{item.label}</span>}
           </NavLink>
         ))}
 
@@ -102,23 +103,23 @@ export default function Sidebar() {
           <NavLink key={item.to} to={item.to} className={({isActive}) =>
             `flex items-center h-11 px-4 my-2 rounded-xl gap-3 transition-colors duration-200 ${isActive ? 'bg-[#1E1E1E] text-white border-l-2 border-white pl-3' : 'text-white/80 hover:bg-[#202020]'}`
           }>
-            <item.Icon className="w-5 h-5" title={item.label} />
-            {!collapsed && <span className="text-sm">{item.label}</span>}
+            <item.Icon className="w-5 h-5 shrink-0" title={item.label} />
+            {!collapsed && <span className="min-w-0 truncate text-sm">{item.label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="px-3 py-4 border-t border-[#232323] flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full bg-[#1E1E1E] flex items-center justify-center text-sm font-semibold text-white">{initials}</div>
+        <div className="w-12 h-12 shrink-0 rounded-full bg-[#1E1E1E] flex items-center justify-center text-sm font-semibold text-white">{initials}</div>
         {!collapsed && (
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-white">{user?.full_name || 'Admin User'}</div>
-            <div className="text-xs text-zinc-400">{user?.role_name || 'Administrator'}</div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-white">{user?.full_name || 'Admin User'}</div>
+            <div className="truncate text-xs text-zinc-400">{user?.role_name || 'Administrator'}</div>
           </div>
         )}
-        <button onClick={handleLogout} className="inline-flex items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors duration-200">
-          <LogOut className="w-4 h-4" />
-          {!collapsed && <span>Log Out</span>}
+        <button onClick={handleLogout} className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-red-400 hover:text-red-300 transition-colors duration-200">
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!collapsed && <span className="truncate">Log Out</span>}
         </button>
       </div>
     </div>

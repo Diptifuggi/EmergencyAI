@@ -42,7 +42,10 @@ class Settings(BaseSettings):
     # Optional local geospatial enrichment. Never use a public runtime service.
     NOMINATIM_URL: str = 'http://localhost:8080'
     NOMINATIM_TIMEOUT_SECONDS: float = 2.0
-    NOMINATIM_COUNTRY_CODE: str = 'in'
+    NOMINATIM_USER_AGENT: str = 'EmergencyIQ/1.0'
+    NOMINATIM_PUBLIC_MIN_INTERVAL_SECONDS: float = 1.0
+    NOMINATIM_CACHE_TTL_SECONDS: int = 86400
+    NOMINATIM_FAILURE_CACHE_TTL_SECONDS: int = 60
     MAP_TILE_URL: str = 'http://localhost:8081/tiles/{z}/{x}/{y}.png'
 
     # Sarvam credentials stay on the backend; never expose this value to Flutter.

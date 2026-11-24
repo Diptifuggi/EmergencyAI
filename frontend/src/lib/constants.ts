@@ -1,6 +1,8 @@
 // @ts-nocheck
 // Prefer an explicit VITE_API_BASE_URL or VITE_API_URL if provided. If not present, use a relative path so Vite dev server proxy can forward requests.
 export const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || (import.meta as any).env.VITE_API_URL || '/api/v1'
+export const MAP_TILE_URL = (import.meta as any).env.VITE_MAP_TILE_URL || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+export const MAP_TILE_ATTRIBUTION = (import.meta as any).env.VITE_MAP_TILE_ATTRIBUTION || '&copy; OpenStreetMap contributors'
 
 export const PRIORITY_CONFIG = {
   Critical:  { bg: "bg-red-100",    text: "text-red-800",    dot: "bg-red-600",    border: "border-l-red-600"   },

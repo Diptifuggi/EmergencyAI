@@ -64,6 +64,7 @@ def _map_to_call_out(call: EmergencyCall) -> CallOut:
 
 @router.post("/", response_model=CallOut, status_code=status.HTTP_201_CREATED)
 async def create_call(payload: CallCreate, db: AsyncSession = Depends(get_db)) -> CallOut:
+    reported_location = payload.location.strip() if payload.location else None
     meta = {
         "caller_phone": payload.caller_number,
         "caller_name": payload.caller_name,
@@ -74,7 +75,8 @@ async def create_call(payload: CallCreate, db: AsyncSession = Depends(get_db)) -
         text_content=payload.text_content,
         priority=payload.priority or "normal",
         status="received",
-        location_address=payload.location,
+        location_address=reported_location or None,
+        location_address_status="reported" if reported_location else "unavailable",
         audio_file_path=payload.audio_reference,
         client_metadata=meta,
     )

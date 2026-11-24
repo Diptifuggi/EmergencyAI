@@ -1,0 +1,224 @@
+text,language,expected_type,expected_help,expected_victim_count,expected_min_level
+My father has severe chest pain and is sweating,en,medical,ambulance+medical_assistance,1,C
+"Papa ko chest pain ho raha hai, bahut paseena aa raha hai",en,medical,ambulance+medical_assistance,1,C
+मेरे पिता के सीने में तेज दर्द है और पसीना आ रहा है,hi,medical,ambulance+medical_assistance,1,C
+મારા પિતાને છાતીમાં સખત દુખાવો થાય છે અને પરસેવો આવે છે,gu,medical,ambulance+medical_assistance,1,C
+माझ्या वडिलांच्या छातीत तीव्र दुखत आहे आणि घाम येत आहे,mr,medical,ambulance+medical_assistance,1,C
+"He collapsed and is not breathing, please come fast",en,medical,ambulance+medical_assistance,1,C
+"Wo gir gaya hai aur saans nahi le raha, jaldi aao",en,medical,ambulance+medical_assistance,1,C
+"वह गिर गया है और सांस नहीं ले रहा, कृपया जल्दी आइए",hi,medical,ambulance+medical_assistance,1,C
+"તે પડી ગયો છે અને શ્વાસ લઈ રહ્યો નથી, કૃપા કરીને જલ્દી આવો",gu,medical,ambulance+medical_assistance,1,C
+"तो पडला आहे आणि श्वास घेत नाही, कृपया लवकर या",mr,medical,ambulance+medical_assistance,1,C
+"Her face is drooping, speech is slurred and one arm is weak",en,medical,ambulance,1,C
+"Uska chehra tedha ho gaya hai, bol nahi pa rahi, ek haath kaam nahi kar raha",en,medical,ambulance,1,C
+"उसका चेहरा लटक रहा है, बोली अस्पष्ट है और एक हाथ कमजोर है",hi,medical,ambulance,1,C
+"તેનો ચહેરો ઢળી ગયો છે, બોલી અસ્પષ્ટ છે અને એક હાથ નબળો છે",gu,medical,ambulance,1,C
+"तिचा चेहरा वाकडा झाला आहे, बोलणे अस्पष्ट आहे आणि एक हात कमजोर आहे",mr,medical,ambulance,1,C
+"She is having a seizure, her body is shaking",en,medical,ambulance,1,H
+"Usko daura pad raha hai, mirgi jaisa",en,medical,ambulance,1,H
+उसे दौरा पड़ रहा है और उसका शरीर कांप रहा है,hi,medical,ambulance,1,H
+તેને આંચકી આવી રહી છે અને તેનું શરીર ધ્રૂજી રહ્યું છે,gu,medical,ambulance,1,H
+तिला झटका येत आहे आणि तिचे शरीर थरथरत आहे,mr,medical,ambulance,1,H
+My child is choking on food and cannot breathe,en,medical,ambulance,1,C
+"Bachcha khana khate hue ghut gaya, saans nahi le pa raha",en,medical,ambulance,1,C
+मेरा बच्चा खाना खाते समय घुट रहा है और सांस नहीं ले पा रहा,hi,medical,ambulance,1,C
+મારું બાળક જમતી વખતે ગૂંગળાઈ ગયું છે અને શ્વાસ લઈ શકતું નથી,gu,medical,ambulance,1,C
+माझे मूल खाताना गुदमरले आहे आणि श्वास घेऊ शकत नाही,mr,medical,ambulance,1,C
+A pregnant woman is in labour pain and bleeding,en,medical,ambulance,1,H
+Pregnant aurat ko labour pain hai aur khoon beh raha hai,en,medical,ambulance,1,H
+एक गर्भवती महिला को प्रसव पीड़ा है और खून बह रहा है,hi,medical,ambulance,1,H
+એક ગર્ભવતી મહિલાને પ્રસવ પીડા છે અને લોહી વહી રહ્યું છે,gu,medical,ambulance,1,H
+एका गर्भवती महिलेला प्रसूती वेदना होत आहेत आणि रक्तस्राव होत आहे,mr,medical,ambulance,1,H
+He drank phenyl and is vomiting,en,medical,ambulance,1,C
+Usne phenyl pi liya hai aur ulti kar raha hai,en,medical,ambulance,1,C
+उसने फिनाइल पी लिया है और उसे उल्टी हो रही है,hi,medical,ambulance,1,C
+તેણે ફિનાઇલ પી લીધું છે અને તેને ઊલટી થઈ રહી છે,gu,medical,ambulance,1,C
+त्याने फिनाइल प्यायले आहे आणि त्याला उलटी होत आहे,mr,medical,ambulance,1,C
+A snake bit my brother on the leg,en,medical,ambulance,1,H
+Bhai ko saanp ne paer mein kaat liya,en,medical,ambulance,1,H
+मेरे भाई को पैर पर सांप ने काट लिया,hi,medical,ambulance,1,H
+મારા ભાઈને પગમાં સાપે ડંખ માર્યો,gu,medical,ambulance,1,H
+माझ्या भावाला पायावर सापाने चावा घेतला,mr,medical,ambulance,1,H
+A stray dog bit a boy and he is bleeding,en,medical,ambulance,1,M
+"Kutte ne ladke ko kaat liya, khoon beh raha hai",en,medical,ambulance,1,M
+एक आवारा कुत्ते ने लड़के को काटा है और उसे खून बह रहा है,hi,medical,ambulance,1,M
+એક રખડતા કૂતરાએ છોકરાને કરડ્યો છે અને તેને લોહી વહી રહ્યું છે,gu,medical,ambulance,1,M
+एका भटक्या कुत्र्याने मुलाला चावा घेतला आणि त्याला रक्त येत आहे,mr,medical,ambulance,1,M
+He got an electric shock and is not moving,en,medical,ambulance,1,C
+Usko current laga hai aur hil nahi raha,en,medical,ambulance,1,C
+उसे बिजली का झटका लगा है और वह हिल नहीं रहा,hi,medical,ambulance,1,C
+તેને વીજળીનો ઝટકો લાગ્યો છે અને તે હલતો નથી,gu,medical,ambulance,1,C
+त्याला विजेचा धक्का बसला आहे आणि तो हालचाल करत नाही,mr,medical,ambulance,1,C
+A boy is drowning in the river,en,medical,ambulance+rescue+fire_service,1,C
+Ek ladka nadi mein doob raha hai,en,medical,ambulance+rescue+fire_service,1,C
+एक लड़का नदी में डूब रहा है,hi,medical,ambulance+rescue+fire_service,1,C
+એક છોકરો નદીમાં ડૂબી રહ્યો છે,gu,medical,ambulance+rescue+fire_service,1,C
+एक मुलगा नदीत बुडत आहे,mr,medical,ambulance+rescue+fire_service,1,C
+He fell from the third floor and cannot move,en,medical,ambulance,1,H
+"Wo teesri manzil se gir gaya, hil nahi pa raha",en,medical,ambulance,1,H
+वह तीसरी मंजिल से गिरा और हिल नहीं पा रहा,hi,medical,ambulance,1,H
+તે ત્રીજા માળેથી પડ્યો અને હલી શકતો નથી,gu,medical,ambulance,1,H
+तो तिसऱ्या मजल्यावरून पडला आणि हालचाल करू शकत नाही,mr,medical,ambulance,1,H
+My grandmother fell in the bathroom and cannot get up,en,medical,ambulance,1,H
+"Dadi bathroom mein gir gayi hain, uth nahi pa rahi",en,medical,ambulance,1,H
+मेरी दादी बाथरूम में गिर गई हैं और उठ नहीं पा रही हैं,hi,medical,ambulance,1,H
+મારા દાદી બાથરૂમમાં પડી ગયા છે અને ઊભા થઈ શકતા નથી,gu,medical,ambulance,1,H
+माझी आजी बाथरूममध्ये पडली आहे आणि उठू शकत नाही,mr,medical,ambulance,1,H
+She got burned by boiling oil,en,medical,ambulance,1,H
+Garam tel se jal gayi hai,en,medical,ambulance,1,H
+वह उबलते तेल से जल गई है,hi,medical,ambulance,1,H
+તે ઉકળતા તેલથી દાઝી ગઈ છે,gu,medical,ambulance,1,H
+ती उकळत्या तेलाने भाजली आहे,mr,medical,ambulance,1,H
+He has an asthma attack and difficulty breathing,en,medical,ambulance,1,C
+"Usko asthma attack aaya hai, saans lene mein dikkat hai",en,medical,ambulance,1,C
+उसे अस्थमा का दौरा पड़ा है और सांस लेने में तकलीफ हो रही है,hi,medical,ambulance,1,C
+તેને અસ્થમાનો હુમલો આવ્યો છે અને શ્વાસ લેવામાં તકલીફ થઈ રહી છે,gu,medical,ambulance,1,C
+त्याला दम्याचा झटका आला आहे आणि श्वास घेण्यास त्रास होत आहे,mr,medical,ambulance,1,C
+I have fever and vomiting since morning,en,medical,medical_assistance,1,M
+Subah se bukhar aur ulti ho rahi hai,en,medical,medical_assistance,1,M
+मुझे सुबह से बुखार और उल्टी हो रही है,hi,medical,medical_assistance,1,M
+મને સવારથી તાવ અને ઊલટી થઈ રહી છે,gu,medical,medical_assistance,1,M
+मला सकाळपासून ताप आणि उलटी होत आहे,mr,medical,medical_assistance,1,M
+He is threatening to jump from the roof,en,medical,police+ambulance,1,C
+Wo chhat se kudne ki dhamki de raha hai,en,medical,police+ambulance,1,C
+वह छत से कूदने की धमकी दे रहा है,hi,medical,police+ambulance,1,C
+તે છત પરથી કૂદવાની ધમકી આપી રહ્યો છે,gu,medical,police+ambulance,1,C
+तो छतावरून उडी मारण्याची धमकी देत आहे,mr,medical,police+ambulance,1,C
+A person was hit by a car and is unconscious,en,accident,police+ambulance+medical_assistance,1,C
+"Ek aadmi ko gaadi ne takkar maari, wo behosh hai",en,accident,police+ambulance+medical_assistance,1,C
+एक आदमी को कार ने टक्कर मार दी है और वह बेहोश है,hi,accident,police+ambulance+medical_assistance,1,C
+એક માણસને કારે ટક્કર મારી છે અને તે બેભાન છે,gu,accident,police+ambulance+medical_assistance,1,C
+एका माणसाला कारने धडक दिली आहे आणि तो बेशुद्ध आहे,mr,accident,police+ambulance+medical_assistance,1,C
+A bike skidded and the rider is bleeding,en,accident,police+ambulance,1,H
+"Bike slip ho gayi, rider ko khoon beh raha hai",en,accident,police+ambulance,1,H
+बाइक फिसल गई और सवार को खून बह रहा है,hi,accident,police+ambulance,1,H
+બાઈક લપસી ગઈ અને સવારને લોહી વહી રહ્યું છે,gu,accident,police+ambulance,1,H
+बाईक घसरली आणि चालकाला रक्त येत आहे,mr,accident,police+ambulance,1,H
+"Two cars collided, nobody is injured",en,accident,police,0,L
+"Do gaadiyan takra gayi, kisi ko chot nahi aayi",en,accident,police,0,L
+"दो कारें टकराईं, किसी को चोट नहीं आई",hi,accident,police,0,L
+"બે કાર અથડાઈ, કોઈને ઈજા થઈ નથી",gu,accident,police,0,L
+"दोन गाड्या धडकल्या, कोणालाही दुखापत झाली नाही",mr,accident,police,0,L
+A bus overturned and around 30 people are injured,en,accident,police+ambulance,30,C
+"Bus palat gayi, lagbhag 30 log ghayal hain",en,accident,police+ambulance,30,C
+एक बस पलट गई और लगभग 30 लोग घायल हैं,hi,accident,police+ambulance,30,C
+એક બસ પલટી ગઈ અને લગભગ 30 લોકો ઘાયલ છે,gu,accident,police+ambulance,30,C
+एक बस उलटली आणि जवळपास 30 लोक जखमी झाले आहेत,mr,accident,police+ambulance,30,C
+A car hit a man and ran away,en,accident,police+ambulance,1,H
+Gaadi ek aadmi ko takkar maar ke bhaag gayi,en,accident,police+ambulance,1,H
+एक कार ने आदमी को टक्कर मारी और भाग गई,hi,accident,police+ambulance,1,H
+એક કારે એક માણસને ટક્કર મારી અને ભાગી ગઈ,gu,accident,police+ambulance,1,H
+एका कारने माणसाला धडक दिली आणि ती पळून गेली,mr,accident,police+ambulance,1,H
+A truck driver is trapped in the cabin on the highway,en,accident,police+rescue+fire_service+ambulance,1,C
+Highway par truck ka driver cabin mein fansa hai,en,accident,police+rescue+fire_service+ambulance,1,C
+हाईवे पर ट्रक का ड्राइवर केबिन में फंसा है,hi,accident,police+rescue+fire_service+ambulance,1,C
+હાઈવે પર ટ્રકનો ડ્રાઈવર કેબિનમાં ફસાયો છે,gu,accident,police+rescue+fire_service+ambulance,1,C
+महामार्गावर ट्रकचा चालक केबिनमध्ये अडकला आहे,mr,accident,police+rescue+fire_service+ambulance,1,C
+A car caught fire after the crash,en,accident or fire,police+fire_service,1,C
+Takkar ke baad car mein aag lag gayi,en,accident or fire,police+fire_service,1,C
+टक्कर के बाद कार में आग लग गई,hi,accident or fire,police+fire_service,1,C
+અકસ્મતા પછી કારમાં આગ લાગી,gu,accident or fire,police+fire_service,1,C
+धडकेनंतर कारला आग लागली,mr,accident or fire,police+fire_service,1,C
+A car fell into the canal with a family inside,en,accident or disaster,rescue+fire_service+ambulance+police,2,C
+"Car nahar mein gir gayi, andar parivar hai",en,accident or disaster,rescue+fire_service+ambulance+police,2,C
+एक कार नहर में गिर गई और परिवार अंदर है,hi,accident or disaster,rescue+fire_service+ambulance+police,2,C
+એક કાર નહેરમાં પડી ગઈ અને પરિવાર અંદર છે,gu,accident or disaster,rescue+fire_service+ambulance+police,2,C
+एक कार कालव्यात पडली आणि कुटुंब आत आहे,mr,accident or disaster,rescue+fire_service+ambulance+police,2,C
+A person was hit by a train at the railway station,en,accident,police+ambulance,1,C
+Railway station par ek aadmi train se kat gaya,en,accident,police+ambulance,1,C
+A train derailed and many people are injured,en,accident,police+ambulance+rescue,5,C
+"Train patri se utar gayi, bahut log ghayal hain",en,accident,police+ambulance+rescue,5,C
+A drunk driver is driving dangerously but there is no crash,en,police,police,1,M
+"Sharabi driver khatarnak tarike se gaadi chala raha hai, accident nahi hua",en,police,police,1,M
+The house is on fire and the family is trapped inside,en,fire,fire_service+rescue+ambulance,2,C
+Ghar mein aag lagi hai aur parivar andar fansa hai,en,fire,fire_service+rescue+ambulance,2,C
+घर में आग लगी है और परिवार अंदर फंसा है,hi,fire,fire_service+rescue+ambulance,2,C
+ઘરમાં આગ લાગી છે અને પરિવાર અંદર ફસાયેલો છે,gu,fire,fire_service+rescue+ambulance,2,C
+घराला आग लागली आहे आणि कुटुंब आत अडकले आहे,mr,fire,fire_service+rescue+ambulance,2,C
+"Factory fire, workers are stuck inside",en,fire,fire_service+rescue+ambulance,2,C
+"Factory mein aag lagi hai, mazdoor andar fanse hain",en,fire,fire_service+rescue+ambulance,2,C
+"Cylinder blast in the kitchen, two people are injured",en,lpg,fire_service+ambulance+rescue+lpg,2,C
+"Kitchen mein cylinder phat gaya, do log ghayal hain",en,lpg,fire_service+ambulance+rescue+lpg,2,C
+"There is a smell of gas in the kitchen, no fire",en,lpg,lpg,1,H
+"Kitchen mein gas ki smell aa rahi hai, aag nahi hai",en,lpg,lpg,1,H
+Sparks and fire from the electric transformer,en,fire,fire_service,1,H
+Transformer se chingari aur aag nikal rahi hai,en,fire,fire_service,1,H
+Smoke is coming from my neighbour's flat,en,fire,fire_service,1,H
+Padosi ke flat se dhuan nikal raha hai,en,fire,fire_service,1,H
+A grass fire is spreading near the village,en,fire,fire_service,1,H
+Gaon ke paas ghaas mein aag fail rahi hai,en,fire,fire_service,1,H
+A firecracker burst and his hand is injured,en,fire or medical,fire_service+ambulance,1,H
+"Patakha phat gaya, uska haath ghayal ho gaya",en,fire or medical,fire_service+ambulance,1,H
+The building collapsed and people are under the debris,en,disaster,rescue+fire_service+ambulance,2,C
+"Building gir gayi, log malbe ke neeche hain",en,disaster,rescue+fire_service+ambulance,2,C
+A child fell into a borewell,en,disaster,rescue+fire_service+ambulance,1,C
+Bachcha borewell mein gir gaya,en,disaster,rescue+fire_service+ambulance,1,C
+Flood water is entering the house and old people are inside,en,disaster,rescue,2,H
+"Ghar mein baadh ka paani aa raha hai, bujurg andar hain",en,disaster,rescue,2,H
+"A cloudburst and landslide hit the village, houses are damaged",en,disaster,multiple_services,1,H
+"Gaon mein badal phata aur landslide hua, ghar toot gaye",en,disaster,multiple_services,1,H
+"Stampede at the temple, many people are hurt",en,disaster,police+ambulance+rescue,5,C
+"Mandir mein bhagdad mach gayi, bahut log ghayal hain",en,disaster,police+ambulance+rescue,5,C
+I am stuck in the lift and feel dizzy,en,disaster,rescue,1,M
+"Main lift mein fans gaya hoon, chakkar aa raha hai",en,disaster,rescue,1,M
+"Lightning struck farmers in the field, they are unconscious",en,medical or disaster,ambulance,2,C
+"Khet mein bijli giri, kisaan behosh hain",en,medical or disaster,ambulance,2,C
+Someone just snatched my gold chain,en,robbery,police,1,M
+Abhi kisi ne meri sone ki chain cheen li,en,robbery,police,1,M
+Someone is breaking into my house right now,en,crime_police,police,1,H
+Mere ghar mein koi ghus raha hai abhi,en,crime_police,police,1,H
+A man with a gun is firing shots,en,assault,police+ambulance,1,C
+Ek aadmi bandook se goliyan chala raha hai,en,assault,police+ambulance,1,C
+Someone kidnapped my child,en,child_safety,police+child_protection,1,C
+Kisi ne mere bachche ko kidnap kar liya,en,child_safety,police+child_protection,1,C
+A man is following me at night and I am scared,en,women_safety,police+women_safety_support,1,H
+"Raat ko ek aadmi mera peecha kar raha hai, mujhe darr lag raha hai",en,women_safety,police+women_safety_support,1,H
+"There is a bomb threat at the railway station, police please come",en,police,police,1,H
+"Railway station par bomb ki dhamki hai, police bhejo",en,police,police,1,H
+A mob is fighting and throwing stones on the road,en,police,police,5,H
+Sadak par bheed ladai kar rahi hai aur patthar phenk rahi hai,en,police,police,5,H
+My husband is beating me,en,domestic_violence,police+women_safety_support,1,H
+Mera pati mujhe maar raha hai,en,domestic_violence,police+women_safety_support,1,H
+A woman is being sexually assaulted in the lane,en,women_safety,police+women_safety_support+ambulance,1,C
+Gali mein ek aurat ke saath balatkar ho raha hai,en,women_safety,police+women_safety_support+ambulance,1,C
+Acid was thrown on her face,en,assault,police+ambulance,1,C
+Uske chehre par tezaab phenk diya,en,assault,police+ambulance,1,C
+Boys are teasing girls outside the college,en,harassment,police+women_safety_support,2,M
+College ke bahar ladke ladkiyon ko chhed rahe hain,en,harassment,police+women_safety_support,2,M
+A child is being beaten at home,en,child_safety,police+child_protection,1,H
+Ghar mein bachche ko maara ja raha hai,en,child_safety,police+child_protection,1,H
+My child is lost in the market,en,child_safety,police+child_protection,1,H
+Mera bachcha bazaar mein kho gaya hai,en,child_safety,police+child_protection,1,H
+My grandfather has dementia and went missing,en,police,police,1,M
+Dada ji ko bhoolne ki bimari hai aur wo gum ho gaye,en,police,police,1,M
+Money was just debited from my account through an OTP fraud,en,cybercrime,cybercrime+police,1,M
+OTP fraud se abhi mere account se paisa kat gaya,en,cybercrime,cybercrime+police,1,M
+Someone is blackmailing me with my morphed photos,en,cybercrime,cybercrime+police,1,H
+Koi meri morphed photos se blackmail kar raha hai,en,cybercrime,cybercrime+police,1,H
+...,en,unknown,unknown,None,L
+,en,unknown,unknown,None,L
+"This is a test call, please ignore",en,unknown or other,-,None,L
+"Yeh test call hai, ignore karo",en,unknown or other,-,None,L
+What is the fire brigade number,en,unknown or other,-,None,L
+Fire brigade ka number kya hai,en,unknown or other,-,None,L
+What should I do if there is a fire,en,unknown,-,None,L
+Agar aag lag jaye to kya karna chahiye,en,unknown,-,None,L
+My phone was stolen yesterday,en,police or unknown,-,None,L
+Mera phone kal chori ho gaya tha,en,police or unknown,-,None,L
+The fire is out and everyone is safe,en,any,-,None,L
+Aag bujh gayi hai aur sab surakshit hain,en,any,-,None,L
+I think someone fell down,en,any,-,None,L
+Mujhe lagta hai koi gir gaya,en,any,-,None,L
+"The car crashed and caught fire, the driver is unconscious",en,accident or fire,police+fire_service+ambulance,1,C
+"Car takra gayi aur aag lag gayi, driver behosh hai",en,accident or fire,police+fire_service+ambulance,1,C
+"Brother, there has been an accident, one man is unconscious and bleeding",en,accident,police+ambulance,1,C
+"Bhai accident ho gaya, ek aadmi behosh hai, khoon beh raha hai",en,accident,police+ambulance,1,C
+"Nobody is injured, only smoke",en,fire,fire_service,0,H
+"Koi ghayal nahi hai, sirf dhuan hai",en,fire,fire_service,0,H
+"He cannot move, he is unconscious",en,medical,ambulance,1,C
+"Wo hil nahi sakta, behosh hai",en,medical,ambulance,1,C
+He is unconscious and not breathing,en,medical,ambulance,1,C
+Wo behosh hai aur saans nahi le raha,en,medical,ambulance,1,C
+There is a fire in the college canteen,en,fire,fire_service,1,C
+College canteen mein aag lagi hai,en,fire,fire_service,1,C
+कालेज की कैंटीन में आग लगी है,hi,fire,fire_service,1,C

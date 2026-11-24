@@ -2,7 +2,13 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.emergency_analysis import EmergencyAnalysis, EmergencyType, HelpRequired
-from app.services.scoring_policy import calculate_help_required, calculate_priority_score, clamp_score, level_for_score
+from app.services.scoring_policy import (
+    calculate_help_required,
+    calculate_priority_score,
+    calculate_severity_score,
+    clamp_score,
+    level_for_score,
+)
 
 
 @pytest.mark.parametrize(
@@ -52,8 +58,8 @@ def test_final_schema_rejects_out_of_range_scores(field: str, value: int) -> Non
         ("Major accident near Vapi Main Highway. Several people are injured and need immediate medical help.", EmergencyType.ACCIDENT, "HIGH", [HelpRequired.AMBULANCE]),
         ("Major accident near Vapi Main Highway. A vehicle is on fire and people are trapped.", EmergencyType.ACCIDENT, "CRITICAL", [HelpRequired.AMBULANCE, HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE]),
         ("Someone is following me while I am walking alone. I am scared. Please send police.", EmergencyType.POLICE, "HIGH", [HelpRequired.POLICE]),
-        ("My father has severe chest pain and needs an ambulance immediately.", EmergencyType.MEDICAL, "HIGH", [HelpRequired.AMBULANCE]),
-        ("There is a fire in a building and people are trapped inside.", EmergencyType.FIRE, "HIGH", [HelpRequired.AMBULANCE, HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE]),
+        ("My father has severe chest pain and needs an ambulance immediately.", EmergencyType.MEDICAL, "CRITICAL", [HelpRequired.AMBULANCE]),
+        ("There is a fire in a building and people are trapped inside.", EmergencyType.FIRE, "CRITICAL", [HelpRequired.AMBULANCE, HelpRequired.FIRE_SERVICE, HelpRequired.RESCUE]),
         ("I lost my phone and need help finding it.", EmergencyType.OTHER, "LOW", [HelpRequired.UNKNOWN]),
     ],
 )
@@ -67,3 +73,40 @@ def test_research_scenarios_have_consistent_priority(
     )
     assert level_for_score(score).value == minimum_level
     assert calculate_help_required(emergency_type=emergency_type, transcript=transcript) == expected_help
+
+
+@pytest.mark.parametrize(
+    ("transcript", "language", "emergency_type", "minimum_score"),
+    [
+        ("My father is unconscious", "en", EmergencyType.MEDICAL, 76),
+        ("मेरी मां बेहोश हैं", "hi", EmergencyType.MEDICAL, 76),
+        ("મારા પિતાને છાતીમાં દુખાવો છે", "gu", EmergencyType.MEDICAL, 76),
+        ("माझ्या वडिलांना हृदयविकाराचा झटका आला आहे", "mr", EmergencyType.MEDICAL, 76),
+        ("There is an explosion in the building", "en", EmergencyType.FIRE, 76),
+        ("A gas leak is active in the kitchen", "en", EmergencyType.LPG, 51),
+    ],
+)
+def test_high_risk_evidence_sets_urgent_human_review_floor(
+    transcript: str,
+    language: str,
+    emergency_type: EmergencyType,
+    minimum_score: int,
+) -> None:
+    score = calculate_priority_score(
+        emergency_type=emergency_type,
+        immediate_threat=False,
+        people_at_risk=0,
+        transcript=transcript,
+        language=language,
+    )
+
+    assert score >= minimum_score
+
+
+def test_active_heart_risk_changes_severity_independently_of_llm_values() -> None:
+    score = calculate_severity_score(
+        emergency_type=EmergencyType.MEDICAL,
+        transcript="My mother is not breathing.",
+    )
+
+    assert level_for_score(score).value == "CRITICAL"

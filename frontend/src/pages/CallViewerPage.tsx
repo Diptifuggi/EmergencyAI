@@ -2,12 +2,6 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import {
   Card,
   CardHeader,
@@ -23,16 +17,10 @@ import {
   TableCell,
 } from '@/components/ui'
 import { getEmergency } from '@/api/emergencyApi'
-import { analysisForCall, categoryForCall, transcriptForCall } from '@/types/emergency'
+import { normalizeEmergencyCall } from '@/lib/emergencyCallNormalizer'
+import CallerLocationMap from '@/components/CallerLocationMap'
 import Loading from '@/components/common/Loading'
 import ErrorMessage from '@/components/common/ErrorMessage'
-
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-})
 
 export default function CallViewerPage() {
   const { id } = useParams()
@@ -47,18 +35,17 @@ export default function CallViewerPage() {
   if (isLoading) return <Loading />
   if (error || !emergency) return <ErrorMessage error={error || new Error('Emergency call not found.')} />
 
-  const analysis = analysisForCall(emergency)
+  const normalizedCall = normalizeEmergencyCall(emergency)
+  const analysis = normalizedCall.analysis
   const metadata = emergency.client_metadata || {}
-  const helpRequired = Array.isArray(analysis.help_required) ? analysis.help_required : []
-  const recommendation = analysis.dispatch_recommendation || {}
-  const recommendedUnits = Array.isArray(recommendation.recommended_units) ? recommendation.recommended_units : []
+  const helpRequired = normalizedCall.helpRequired
+  const recommendation = normalizedCall.dispatchRecommendation
+  const recommendedUnits = normalizedCall.recommendedUnits
   const emergencyNumbers = recommendation.emergency_numbers && typeof recommendation.emergency_numbers === 'object'
     ? recommendation.emergency_numbers
     : {}
-  const transcript = transcriptForCall(emergency)
-  const rawTranscript = emergency.text_content && emergency.text_content.trim() ? emergency.text_content : (transcript || 'Not available')
-  const latitude = emergency.latitude ?? emergency.location?.latitude ?? null
-  const longitude = emergency.longitude ?? emergency.location?.longitude ?? null
+  const latitude = normalizedCall.latitude
+  const longitude = normalizedCall.longitude
   const timestamp = emergency.created_at ? new Date(emergency.created_at) : null
   const updatedAt = emergency.updated_at ? new Date(emergency.updated_at) : null
   const callDate = timestamp && !Number.isNaN(timestamp.getTime())
@@ -69,30 +56,40 @@ export default function CallViewerPage() {
     : 'Not available'
   const city = typeof metadata.city === 'string' && metadata.city.trim() ? metadata.city : 'Not available'
   const state = typeof metadata.state === 'string' && metadata.state.trim() ? metadata.state : 'Not available'
-  const keywords = Array.isArray(analysis.emergency_keywords) ? analysis.emergency_keywords : []
+  const keywords = normalizedCall.emergencyKeywords
   const audioEvents = Array.isArray((emergency as any)?.audio_events) ? (emergency as any).audio_events : []
-  const dispatches = recommendedUnits.length > 0
-    ? recommendedUnits.map((unit: string) => ({
-        department: unit,
-        officer: 'Recommendation only',
-        status: recommendation.reason || 'Recommendation only',
-      }))
-    : []
-  const locationDisplay = [emergency.location_address || metadata.location_address, city, state].filter((value) => typeof value === 'string' && value.trim()).join(', ')
+  const dispatches = normalizedCall.dispatchRecords
+  const helpHas = (terms: string[]) => helpRequired.some((item: string) =>
+    terms.includes(String(item).trim().toLowerCase())
+  )
+  const serviceState = (terms: string[]) => {
+    if (helpHas(terms)) return 'Recommended'
+    return Array.isArray(analysis.help_required) ? 'Not recommended' : 'Not reported'
+  }
+  const indicatorState = (key: string) => {
+    if (analysis[key] === true) return 'Detected'
+    if (analysis[key] === false) return 'Not detected'
+    return 'Not reported'
+  }
+  const transcript = normalizedCall.cleanTranscript
+  const rawTranscript = normalizedCall.textContent || normalizedCall.transcription || 'Not available'
   const call = {
     id: emergency.id,
-    caller_name: typeof metadata.caller_name === 'string' && metadata.caller_name.trim() ? metadata.caller_name : 'Not available',
-    caller_phone: typeof metadata.caller_phone === 'string' && metadata.caller_phone.trim() ? metadata.caller_phone : 'Not available',
-    caller_email: typeof metadata.caller_email === 'string' && metadata.caller_email.trim() ? metadata.caller_email : 'Not available',
+    caller_name: normalizedCall.callerName || 'Not provided',
+    caller_phone: normalizedCall.callerPhone || 'Not provided',
+    caller_email: normalizedCall.callerEmail || 'Not provided',
     age: metadata.age ?? 'Not available',
     gender: typeof metadata.gender === 'string' && metadata.gender.trim() ? metadata.gender : 'Not available',
-    language: emergency.language || emergency.requested_language || 'Not available',
-    source: emergency.source || 'Not available',
+    language: normalizedCall.language || 'Not reported',
+    source: normalizedCall.source || normalizedCall.platform || 'Not reported',
     call_type: emergency.call_type || 'Not available',
     status: emergency.status || 'Not available',
-    priority: (analysis.priority_level || emergency.priority || 'Not available').toString(),
-    category: categoryForCall(emergency),
-    address: emergency.location_address || locationDisplay || 'Not available',
+    priority: normalizedCall.priority || 'Not reported',
+    category: normalizedCall.category
+      ? normalizedCall.category.replaceAll('_', ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase())
+      : 'Not reported',
+    sub_type: normalizedCall.subType || 'Not reported',
+    address: normalizedCall.locationAddress || 'Address not available',
     city,
     state,
     latitude,
@@ -101,33 +98,41 @@ export default function CallViewerPage() {
     call_clock: callClock,
     updated_at: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt.toLocaleString('en-GB') : 'Not available',
     duration: 'Not available',
-    severity_score: typeof analysis.priority_score === 'number' ? analysis.priority_score : null,
-    emotion: analysis.panic_level ? `Panic (${analysis.panic_level})` : 'Not available',
-    emotion_score: typeof analysis.panic_score === 'number' ? analysis.panic_score / 100 : null,
-    background_noise: 'Not available',
-    noise_level: 'Not available',
-    vehicle_count: analysis.road_accident ? 'Road accident' : 'Not available',
-    injured_people: typeof analysis.victim_count === 'number' ? String(analysis.victim_count) : 'Not available',
-    fatalities: 'Not available',
-    ambulance_required: helpRequired.length > 0 ? helpRequired.some((item) => String(item).toLowerCase().includes('ambulance') || String(item).toLowerCase().includes('medical')) : null,
-    police_required: typeof analysis.police_required === 'boolean' ? analysis.police_required : helpRequired.some((item) => String(item).toLowerCase().includes('police')),
-    fire_required: helpRequired.some((item) => String(item).toLowerCase().includes('fire')),
+    severity: analysis.severity ?? 'Not reported',
+    priority_score: normalizedCall.priorityScore,
+    confidence: normalizedCall.confidence,
+    incident_description: analysis.incident_description || 'Not reported',
+    caller_request: analysis.caller_request || 'Not reported',
+    victim_count: typeof analysis.victim_count === 'number' ? analysis.victim_count : null,
+    ambulance_recommended: serviceState(['ambulance', 'medical_assistance']),
+    police_recommended: analysis.police_required === true || helpHas(['police']) ? 'Recommended' : indicatorState('police_required'),
+    fire_recommended: serviceState(['fire_service']),
+    rescue_recommended: serviceState(['rescue']),
+    injuries: indicatorState('injuries_present'),
+    fatalities: 'Not reported',
     incident_id: null,
     transcript_raw: rawTranscript,
-    transcript_clean: transcript || 'Not available',
+    transcript_clean: transcript || 'Not reported separately',
     keywords,
     audio_events: audioEvents,
     audio_url: emergency.audio_url || null,
-    map_snapshot_url: emergency.map_snapshot_url || null,
+    map_snapshot_url: normalizedCall.mapSnapshotUrl,
     score_breakdown: {
-      category: analysis.emergency_type || 'Not available',
+      category: normalizedCall.category || 'Not reported',
       keywords: keywords.length ? keywords.join(', ') : 'Not available',
-      emotion: typeof analysis.panic_score === 'number' ? analysis.panic_score : 'Not available',
-      audio: emergency.audio_file_size ? `${emergency.audio_file_size} bytes` : 'Not available',
-      location: latitude != null && longitude != null ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` : 'Not available',
+      emotion: typeof analysis.panic_score === 'number' ? analysis.panic_score : 'Not measured',
+      audio: emergency.audio_file_size != null ? `${emergency.audio_file_size} bytes` : 'Not available',
+      location: latitude !== null && longitude !== null ? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` : 'Not available',
     },
     dispatches,
     emergency_numbers: emergencyNumbers,
+    help_required: helpRequired,
+    recommended_units: recommendedUnits,
+    recommendation,
+    human_confirmation_required: analysis.human_confirmation_required,
+    location_accuracy: normalizedCall.locationAccuracy,
+    location_status: normalizedCall.locationStatus,
+    map_snapshot_available: normalizedCall.mapSnapshotAvailable,
   }
   const scoreRows = [
     { label: 'Category', value: call.score_breakdown.category ?? 'Not available' },
@@ -136,8 +141,6 @@ export default function CallViewerPage() {
     { label: 'Audio', value: call.score_breakdown.audio ?? 'Not available' },
     { label: 'Location', value: call.score_breakdown.location ?? 'Not available' },
   ]
-  const hasLocation = latitude != null && longitude != null
-
   const handleDownloadReport = () => {
     const content = `Emergency Call Report\n\nCall ID: ${call.id}\nCaller: ${call.caller_name}\nPhone: ${call.caller_phone}\nEmail: ${call.caller_email}\nStatus: ${call.status}\nPriority: ${call.priority}\nCategory: ${call.category}\n\nTranscript:\n${call.transcript_clean}\n`
     const blob = new Blob([content], { type: 'application/pdf' })
@@ -199,7 +202,11 @@ export default function CallViewerPage() {
               <div className="space-y-3 text-sm">
                 <div>
                   <div className="text-zinc-500">Address</div>
-                  <div className="font-medium">{[call.address, call.city, call.state].filter((part) => typeof part === 'string' && part && part !== 'Not available').join(', ') || 'Not available'}</div>
+                  <div className="font-medium">{call.address}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><div className="text-zinc-500">City</div><div className="font-medium">{call.city}</div></div>
+                  <div><div className="text-zinc-500">State</div><div className="font-medium">{call.state}</div></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -236,13 +243,22 @@ export default function CallViewerPage() {
               <CardTitle>Call Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-zinc-600">
-              <div><strong>Vehicles involved:</strong> {call.vehicle_count}</div>
-              <div><strong>Injured people:</strong> {call.injured_people}</div>
+              <div><strong>People reported:</strong> {call.victim_count == null ? 'Not reported' : call.victim_count}</div>
+              <div><strong>Injuries:</strong> {call.injuries}</div>
               <div><strong>Fatalities:</strong> {call.fatalities}</div>
-              <div><strong>Ambulance required:</strong> {call.ambulance_required == null ? 'Not available' : call.ambulance_required ? 'Yes' : 'No'}</div>
-              <div><strong>Police required:</strong> {call.police_required == null ? 'Not available' : call.police_required ? 'Yes' : 'No'}</div>
-              <div><strong>Fire required:</strong> {call.fire_required == null ? 'Not available' : call.fire_required ? 'Yes' : 'No'}</div>
-              <div><strong>Noise level:</strong> {call.noise_level}</div>
+              <div><strong>Ambulance:</strong> {call.ambulance_recommended}</div>
+              <div><strong>Police:</strong> {call.police_recommended}</div>
+              <div><strong>Fire service:</strong> {call.fire_recommended}</div>
+              <div><strong>Rescue:</strong> {call.rescue_recommended}</div>
+              <div><strong>Other reported hazards:</strong> {[
+                ['Smoke', analysis.smoke_present],
+                ['Fire', analysis.fire_present],
+                ['Explosion', analysis.explosion_present],
+                ['Entrapment', analysis.trapped_persons],
+                ['Weapon', analysis.weapon_present],
+                ['Flood risk', analysis.flood_risk],
+                ['LPG leak', analysis.lpg_leak],
+              ].filter(([, value]) => value === true).map(([label]) => label).join(', ') || 'None detected'}</div>
             </CardContent>
           </Card>
         </div>
@@ -270,21 +286,42 @@ export default function CallViewerPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><div className="text-zinc-500">Emergency type</div><div className="font-medium">{call.category}</div></div>
+                <div><div className="text-zinc-500">Subtype</div><div className="font-medium">{call.sub_type}</div></div>
+                <div><div className="text-zinc-500">Severity</div><div className="font-medium">{call.severity}</div></div>
+                <div><div className="text-zinc-500">Priority</div><div className="font-medium">{call.priority}</div></div>
+                <div><div className="text-zinc-500">Priority score</div><div className="font-medium">{call.priority_score ?? 'Not reported'}</div></div>
+                <div><div className="text-zinc-500">Confidence</div><div className="font-medium">{call.confidence == null ? 'Not available' : `${(call.confidence * 100).toFixed(0)}%`}</div></div>
+                <div><div className="text-zinc-500">Victim count</div><div className="font-medium">{call.victim_count ?? 'Not reported'}</div></div>
+              </div>
+              <div>
+                <div className="text-sm text-zinc-500">Incident description</div>
+                <div className="mt-2 text-sm leading-6">{call.incident_description}</div>
+              </div>
+              <div>
+                <div className="text-sm text-zinc-500">Caller request</div>
+                <div className="mt-2 text-sm leading-6">{call.caller_request}</div>
+              </div>
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <div><div className="text-zinc-500">Recommended help</div><div>{call.help_required.length ? call.help_required.join(', ') : 'Not reported'}</div></div>
+                <div><div className="text-zinc-500">Recommended response units</div><div>{call.recommended_units.length ? call.recommended_units.join(', ') : 'None mapped'}</div></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-zinc-500">Emotion</div>
-                  <div className="font-medium">{call.emotion}</div>
+                  <div className="text-zinc-500">Panic estimate</div>
+                  <div className="font-medium">{analysis.panic_level || 'Not measured'}</div>
                 </div>
                 <div>
-                  <div className="text-zinc-500">Emotion Score</div>
-                  <div className="font-medium">{call.emotion_score == null ? 'Not available' : `${(call.emotion_score * 100).toFixed(0)}%`}</div>
+                  <div className="text-zinc-500">Panic score</div>
+                  <div className="font-medium">{typeof analysis.panic_score === 'number' ? analysis.panic_score : 'Not measured'}</div>
                 </div>
                 <div>
                   <div className="text-zinc-500">Background Noise</div>
-                  <div className="font-medium">{call.background_noise}</div>
+                  <div className="font-medium">Not analyzed</div>
                 </div>
                 <div>
                   <div className="text-zinc-500">Noise Level</div>
-                  <div className="font-medium">{call.noise_level}</div>
+                  <div className="font-medium">Not analyzed</div>
                 </div>
               </div>
               <div>
@@ -313,14 +350,15 @@ export default function CallViewerPage() {
         <aside className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Severity Summary</CardTitle>
+              <CardTitle>Analysis Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
-                <div className="text-5xl font-extrabold text-zinc-900">{call.severity_score ?? 'Not available'}</div>
-                <div className="text-sm text-zinc-500">/ 100</div>
+                <div className="text-5xl font-extrabold text-zinc-900">{call.priority_score ?? 'Not available'}</div>
+                <div className="text-sm text-zinc-500">Operational priority score / 100</div>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
+                <Badge className="bg-indigo-600 text-white">Severity: {call.severity}</Badge>
                 <Badge className="bg-red-500 text-white">{call.priority}</Badge>
                 <Badge className="bg-slate-800 text-white">{call.status}</Badge>
               </div>
@@ -343,13 +381,31 @@ export default function CallViewerPage() {
               <CardTitle>Dispatch Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-zinc-600">
-              {Array.isArray(call.dispatches) && call.dispatches.length > 0 ? call.dispatches.map((dispatch) => (
-                <div key={dispatch.department} className="rounded-lg border border-zinc-200 p-3">
-                  <div className="font-medium">{dispatch.department}</div>
-                  <div>{dispatch.officer}</div>
-                  <div className="mt-1"><Badge className="bg-slate-800 text-white">{dispatch.status}</Badge></div>
+              {call.human_confirmation_required === true ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
+                  AI recommendations only. Human dispatcher confirmation is required before any dispatch.
                 </div>
-              )) : <div className="text-sm text-zinc-500">No dispatch data returned by the backend.</div>}
+              ) : (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-zinc-700">
+                  AI-generated recommendation; operational confirmation status is not available.
+                </div>
+              )}
+              <div><strong>Recommendation reason:</strong> {call.recommendation.reason || 'Not reported'}</div>
+              <div><strong>Priority reason:</strong> {call.recommendation.priority_reason || 'Not reported'}</div>
+              <div><strong>Dispatcher action:</strong> {call.recommendation.dispatcher_action || 'Not reported'}</div>
+              <div>
+                <strong>Configured emergency numbers:</strong>
+                {Object.keys(call.emergency_numbers).length
+                  ? <ul className="mt-1 list-inside list-disc">{Object.entries(call.emergency_numbers).map(([number, label]) => <li key={number}>{number}: {String(label)}</li>)}</ul>
+                  : <span> Not reported</span>}
+              </div>
+              {Array.isArray(call.dispatches) && call.dispatches.length > 0 ? call.dispatches.map((dispatch, index) => (
+                <div key={dispatch.id || dispatch.department || index} className="rounded-lg border border-zinc-200 p-3">
+                  <div className="font-medium">{dispatch.department || dispatch.details?.department || dispatch.details?.unit || dispatch.details?.service || 'Recorded dispatch'}</div>
+                  {dispatch.officer && <div>{dispatch.officer}</div>}
+                  <div className="mt-1"><Badge className="bg-slate-800 text-white">{dispatch.status || 'Recorded'}</Badge></div>
+                </div>
+              )) : <div className="text-sm text-zinc-500">No confirmed operational dispatch is recorded for this call.</div>}
             </CardContent>
           </Card>
         </aside>
@@ -361,15 +417,20 @@ export default function CallViewerPage() {
             <CardTitle>Caller Location</CardTitle>
           </CardHeader>
           <CardContent>
-            {hasLocation ? <div className="h-72 rounded-xl overflow-hidden border border-zinc-200">
-              <MapContainer center={[call.latitude, call.longitude]} zoom={14} style={{ height: '100%', width: '100%' }}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <Marker position={[call.latitude, call.longitude]}>
-                  <Popup>Caller Location<br />{call.address}</Popup>
-                </Marker>
-              </MapContainer>
-            </div> : <div className="h-72 rounded-xl overflow-hidden border border-zinc-200 flex items-center justify-center text-sm text-zinc-500">No location data</div>}
-            <div className="mt-3 text-sm text-zinc-500">Caller Location • {call.address}{hasLocation ? ` (${call.latitude}, ${call.longitude})` : ''}</div>
+            <CallerLocationMap
+              latitude={latitude}
+              longitude={longitude}
+              accuracy={normalizedCall.locationAccuracy}
+              address={normalizedCall.locationAddress}
+              addressStatus={normalizedCall.locationAddressStatus}
+              status={normalizedCall.locationStatus}
+              capturedAt={normalizedCall.locationTimestamp}
+              coordinateStatus={normalizedCall.locationCoordinatesStatus}
+              coordinatesConflict={normalizedCall.locationCoordinatesConflict}
+              snapshotAvailable={normalizedCall.mapSnapshotAvailable}
+              snapshotUrl={normalizedCall.mapSnapshotUrl}
+              label="Caller device GPS location"
+            />
           </CardContent>
         </Card>
 

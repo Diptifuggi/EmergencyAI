@@ -14,6 +14,7 @@ import 'package:record/record.dart';
 import '../core/language/emergency_language_option.dart';
 import '../core/language/language_mapper.dart';
 import '../core/network/api_client.dart';
+import '../core/network/api_config.dart';
 import '../models/emergency_call.dart';
 import '../models/emergency_location.dart';
 import '../services/emergency_api_service.dart';
@@ -42,12 +43,14 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   bool _isSarvamRecording = false;
   bool _isSubmitting = false;
   bool _isTranscribing = false;
+  bool _isRefreshingAnalysis = false;
   String? _audioPath;
   String? _transcriptionLanguage;
   Map<String, dynamic>? _transcriptionMetadata;
   String? _statusMessage;
   String? _backendUrl;
   bool _isDiscoveringBackend = false;
+  bool _isBackendConnected = false;
   String? _pendingTextSubmissionKey;
   String? _pendingVoiceSubmissionKey;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
@@ -88,31 +91,60 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   }
 
   Future<void> _initBackendConnection() async {
-    setState(() => _isDiscoveringBackend = true);
-    try {
-      final url = await ApiClient.getBaseUrl();
-      if (!mounted) return;
-      setState(() => _backendUrl = url);
-    } finally {
-      if (mounted) setState(() => _isDiscoveringBackend = false);
-    }
+    await _checkBackendConnection();
 
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((results) async {
       final onWifi = results.contains(ConnectivityResult.wifi) ||
           results.contains(ConnectivityResult.ethernet);
-      if (!onWifi || !mounted) return;
-
-      setState(() => _isDiscoveringBackend = true);
-      try {
-        final url = await ApiClient.refreshBaseUrl();
-        if (!mounted) return;
-        setState(() => _backendUrl = url);
-        debugPrint('[EmergencyIQ] Backend refreshed after Wi-Fi connect: $url');
-      } finally {
-        if (mounted) setState(() => _isDiscoveringBackend = false);
+      if (onWifi && mounted) {
+        await _checkBackendConnection(refresh: true);
       }
     });
+  }
+
+  Future<void> _checkBackendConnection({bool refresh = false}) async {
+    if (!mounted || _isDiscoveringBackend) return;
+    setState(() => _isDiscoveringBackend = true);
+    try {
+      if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+        final url = await ApiClient.getBaseUrl();
+        if (!mounted) return;
+        setState(() {
+          _backendUrl = url;
+          _isBackendConnected = false;
+        });
+        return;
+      }
+
+      final url = refresh
+          ? await ApiClient.refreshBaseUrl()
+          : await ApiClient.getBaseUrl();
+      await EmergencyApiService().healthCheck();
+      if (!mounted) return;
+      setState(() {
+        _backendUrl = url;
+        _isBackendConnected = true;
+      });
+    } on ApiException catch (error) {
+      debugPrint('[EmergencyIQ] Backend health check failed: $error');
+      if (!mounted) return;
+      setState(() {
+        _backendUrl = ApiClient.baseUrl;
+        _isBackendConnected = false;
+      });
+    } catch (error) {
+      debugPrint(
+        '[EmergencyIQ] Backend discovery failed (${error.runtimeType}).',
+      );
+      if (!mounted) return;
+      setState(() {
+        _backendUrl = ApiClient.baseUrl;
+        _isBackendConnected = false;
+      });
+    } finally {
+      if (mounted) setState(() => _isDiscoveringBackend = false);
+    }
   }
 
   String _formatSavedCall(EmergencyCall call) {
@@ -124,6 +156,57 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         ? ''
         : ' Accuracy: ${call.locationAccuracy!.toStringAsFixed(1)}m.';
     return 'Saved (id: $shortId). Lat: $lat, Long: $long.$accuracy Status: ${call.status}.';
+  }
+
+  Future<void> _pollForEmergencyAnalysis(String callId) async {
+    if (_isRefreshingAnalysis) return;
+    setState(() => _isRefreshingAnalysis = true);
+    final stopwatch = Stopwatch()..start();
+    var interval = ApiConfig.analysisPollInterval;
+
+    try {
+      while (mounted && stopwatch.elapsed < ApiConfig.analysisPollTimeout) {
+        await Future<void>.delayed(interval);
+        if (!mounted) return;
+
+        final updatedCall =
+            await EmergencyApiService().getEmergencyCall(callId: callId);
+        if (!mounted) return;
+
+        setState(() {
+          _lastSavedCall = updatedCall;
+          if (updatedCall.status == 'analyzed') {
+            _statusMessage =
+                'Emergency analysis complete. ${_formatSavedCall(updatedCall)}';
+          } else if (updatedCall.status == 'analysis_failed') {
+            _statusMessage =
+                'Emergency analysis could not be completed. ${_formatSavedCall(updatedCall)}';
+          } else {
+            _statusMessage =
+                'Emergency analysis is still running. ${_formatSavedCall(updatedCall)}';
+          }
+        });
+
+        if (updatedCall.status != 'analyzing') return;
+        interval = Duration(seconds: min(interval.inSeconds + 1, 6));
+      }
+
+      if (mounted) {
+        setState(() {
+          _statusMessage =
+              'Analysis is still processing. Use Refresh analysis to check again.';
+        });
+      }
+    } on ApiException {
+      if (mounted) {
+        setState(() {
+          _statusMessage =
+              'Could not refresh analysis status. Use Refresh analysis to try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshingAnalysis = false);
+    }
   }
 
   Future<EmergencyLocation?> _locationForSubmission() async {
@@ -142,6 +225,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     } catch (error) {
       if (mounted) {
         setState(() {
+          _clearLocationDraft();
           _locationError = error.toString();
           _statusMessage =
               'GPS unavailable; submitting without live location. $error';
@@ -149,6 +233,15 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
       }
       return null;
     }
+  }
+
+  void _clearLocationDraft() {
+    _currentLocation = null;
+    _latitudeController.clear();
+    _longitudeController.clear();
+    _mapSnapshot = null;
+    _mapSnapshotStatus = 'Map snapshot not captured';
+    _locationError = null;
   }
 
   void _onLanguageChanged(EmergencyLanguageOption? value) {
@@ -364,7 +457,23 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
           _mapSnapshotStatus = 'Map snapshot unavailable: ${_friendlyError(error)}';
         }
       }
-      _showMessage(_formatSavedCall(call));
+      final savedCall = _lastSavedCall ?? call;
+      final snapshotFailure = _mapSnapshotStatus.startsWith('Map snapshot unavailable:')
+          ? _mapSnapshotStatus
+          : null;
+      setState(_clearLocationDraft);
+      if (savedCall.status == 'analyzing') {
+        _showMessage(
+          '${_formatSavedCall(savedCall)} Analysis is running; checking for the completed result.'
+          '${snapshotFailure == null ? '' : ' $snapshotFailure'}',
+        );
+        unawaited(_pollForEmergencyAnalysis(savedCall.id));
+      } else {
+        _showMessage(
+          '${_formatSavedCall(savedCall)}'
+          '${snapshotFailure == null ? '' : ' $snapshotFailure'}',
+        );
+      }
       _textController.clear();
     } catch (error) {
       _showMessage(_friendlyError(error));
@@ -517,6 +626,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         _audioPath = null;
         _transcriptionLanguage = null;
         _transcriptionMetadata = null;
+        _clearLocationDraft();
       });
     } catch (error) {
       _showMessage(_friendlyError(error));
@@ -672,20 +782,65 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   }
 
   Widget _buildBackendBanner() {
-    final label = _isDiscoveringBackend
-        ? 'Finding backend on Wi-Fi…'
-        : 'Backend: ${_backendUrl ?? 'not connected'}';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 12, color: AppColors.secondaryText),
+    final status = _isDiscoveringBackend
+        ? 'Checking backend connection…'
+        : _isBackendConnected
+            ? 'Backend connected'
+            : 'Backend unavailable — tap to retry';
+    return InkWell(
+      onTap: _isDiscoveringBackend
+          ? null
+          : () => unawaited(_checkBackendConnection(refresh: true)),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _isDiscoveringBackend
+                  ? Icons.sync
+                  : _isBackendConnected
+                      ? Icons.cloud_done_outlined
+                      : Icons.cloud_off_outlined,
+              size: 18,
+              color: _isBackendConnected
+                  ? AppColors.primary
+                  : AppColors.secondaryText,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    status,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                  if (_backendUrl != null)
+                    Text(
+                      _backendUrl!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (!_isDiscoveringBackend)
+              const Icon(Icons.refresh,
+                  size: 18, color: AppColors.secondaryText),
+          ],
+        ),
       ),
     );
   }
@@ -868,6 +1023,23 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
                 ),
               if (_lastSavedCall != null) ...[
                 const SizedBox(height: 18),
+                if (_lastSavedCall!.status == 'analyzing')
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _isRefreshingAnalysis
+                          ? null
+                          : () => unawaited(
+                                _pollForEmergencyAnalysis(_lastSavedCall!.id),
+                              ),
+                      icon: const Icon(Icons.refresh),
+                      label: Text(
+                        _isRefreshingAnalysis
+                            ? 'Checking analysis…'
+                            : 'Refresh analysis',
+                      ),
+                    ),
+                  ),
                 EmergencyLocationCard(
                   call: _lastSavedCall!,
                   mapSnapshot: _mapSnapshot,

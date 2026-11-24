@@ -30,7 +30,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import BASE_DIR, settings
-from ...core.database import get_db
+from ...core.database import async_session, get_db
 from ...core.exceptions import FileTooLargeError, InvalidFileTypeError
 from ...core.language import bcp47_language
 from ...core.logger import get_logger
@@ -47,6 +47,7 @@ from ...services.emergency_call_analysis_runner import (
     run_post_create_analysis_in_background,
 )
 from ...services.location_service import reverse_geocode
+from ...services.map_snapshot_storage import MAP_SNAPSHOT_DIR, resolve_map_snapshot_path
 
 
 router = APIRouter()
@@ -73,14 +74,62 @@ def _persisted_language(language: str) -> str | None:
 
 UPLOAD_DIR = BASE_DIR / "backend" / "storage" / "audio"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAP_SNAPSHOT_DIR = BASE_DIR / "backend" / "storage" / "map_snapshots"
 MAP_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-async def _location_address(latitude: float | None, longitude: float | None) -> str | None:
-    if latitude is None or longitude is None:
-        return None
-    return await reverse_geocode(latitude, longitude)
+def _location_address_state(
+    latitude: float | None,
+    longitude: float | None,
+    reported_address: str | None,
+) -> tuple[str | None, str]:
+    if reported_address and reported_address.strip():
+        return reported_address.strip(), "reported"
+    if latitude is not None and longitude is not None:
+        return None, "pending"
+    return None, "unavailable"
+
+
+async def _resolve_location_address_background(
+    call_id: uuid.UUID,
+    latitude: float,
+    longitude: float,
+) -> None:
+    address = await reverse_geocode(latitude, longitude)
+    async with async_session() as db:
+        result = await db.execute(
+            select(EmergencyCall)
+            .where(EmergencyCall.id == call_id)
+            .with_for_update()
+        )
+        emergency = result.scalar_one_or_none()
+        if (
+            emergency is None
+            or emergency.latitude != latitude
+            or emergency.longitude != longitude
+            or emergency.location_address_status != "pending"
+            or emergency.location_address
+        ):
+            return
+        emergency.location_address = address
+        emergency.location_address_status = "resolved" if address else "failed"
+        await db.commit()
+
+
+def _schedule_location_address(
+    background_tasks: BackgroundTasks,
+    emergency: EmergencyCall,
+) -> None:
+    if (
+        emergency.location_address_status == "pending"
+        and emergency.latitude is not None
+        and emergency.longitude is not None
+    ):
+        background_tasks.add_task(
+            _resolve_location_address_background,
+            emergency.id,
+            emergency.latitude,
+            emergency.longitude,
+        )
 
 
 def _parse_location_timestamp(raw: str | None) -> datetime | None:
@@ -170,6 +219,16 @@ def _parse_metadata(raw: str | None) -> dict[str, Any] | None:
             detail="client_metadata must be a JSON object",
         )
     return parsed
+
+
+def _merge_client_metadata(
+    existing: dict[str, Any] | None,
+    patch: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        **(existing or {}),
+        **{key: value for key, value in patch.items() if value is not None},
+    }
 
 
 def _looks_like_mp3(contents: bytes) -> bool:
@@ -364,6 +423,11 @@ async def create_text_emergency(
     requested_language = _validate_language(payload.language)
     metadata = dict(payload.client_metadata or {})
     metadata.setdefault("requested_language", requested_language)
+    location_address, address_status = _location_address_state(
+        payload.latitude,
+        payload.longitude,
+        payload.location_address,
+    )
     emergency = EmergencyCall(
         call_type="text",
         text_content=payload.text,
@@ -372,7 +436,8 @@ async def create_text_emergency(
         longitude=payload.longitude,
         location_accuracy=payload.location_accuracy,
         location_timestamp=payload.location_timestamp,
-        location_address=await _location_address(payload.latitude, payload.longitude),
+        location_address=location_address,
+        location_address_status=address_status,
         location_status=_location_status(payload.latitude, payload.longitude),
         source=payload.source,
         priority=payload.priority,
@@ -411,6 +476,7 @@ async def create_text_emergency(
         ) from exc
 
     _schedule_emergency_analysis(background_tasks, emergency)
+    _schedule_location_address(background_tasks, emergency)
     logger.info(
         "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
         emergency.id,
@@ -423,6 +489,7 @@ async def create_text_emergency(
 @router.post("/manual", response_model=EmergencyCallOut, status_code=status.HTTP_201_CREATED)
 async def create_manual_emergency(
     payload: EmergencyCallManualCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """Persist caller/operator metadata without fabricating emergency text."""
@@ -433,6 +500,11 @@ async def create_manual_emergency(
         "call_started_at": payload.started_at.isoformat() if payload.started_at else None,
         "platform": "react_operator",
     }
+    location_address, address_status = _location_address_state(
+        payload.latitude,
+        payload.longitude,
+        payload.location_address,
+    )
     emergency = EmergencyCall(
         call_type="manual",
         status="received",
@@ -441,7 +513,8 @@ async def create_manual_emergency(
         client_metadata=metadata,
         latitude=payload.latitude,
         longitude=payload.longitude,
-        location_address=await _location_address(payload.latitude, payload.longitude),
+        location_address=location_address,
+        location_address_status=address_status,
         location_status=_location_status(payload.latitude, payload.longitude),
     )
     try:
@@ -455,6 +528,7 @@ async def create_manual_emergency(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Emergency storage is temporarily unavailable",
         ) from exc
+    _schedule_location_address(background_tasks, emergency)
     return emergency
 
 
@@ -469,6 +543,7 @@ async def create_audio_emergency(
     longitude: float | None = Form(None),
     location_accuracy: float | None = Form(None),
     location_timestamp: str | None = Form(None),
+    location_address: str | None = Form(None),
     source: str = Form("flutter"),
     priority: str = Form("normal"),
     existing_call_id: uuid.UUID | None = Form(None),
@@ -505,10 +580,22 @@ async def create_audio_emergency(
     meta.setdefault("requested_language", requested_language)
     cleaned_transcription = (transcription or "").strip() or None
 
+    if existing_call_id is not None:
+        result = await db.execute(
+            select(EmergencyCall)
+            .where(EmergencyCall.id == existing_call_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        existing_emergency = result.scalar_one_or_none()
+        if existing_emergency is None:
+            raise HTTPException(status_code=404, detail="Emergency call not found")
+
     if existing_emergency is not None:
-        existing_metadata = dict(existing_emergency.client_metadata or {})
-        existing_metadata.update(meta)
-        existing_emergency.client_metadata = existing_metadata
+        existing_emergency.client_metadata = _merge_client_metadata(
+            existing_emergency.client_metadata,
+            meta,
+        )
         if idempotency_key is not None:
             existing_emergency.idempotency_key = idempotency_key
         existing_emergency.audio_file_path = relative_path
@@ -524,6 +611,7 @@ async def create_audio_emergency(
         existing_emergency.status = "received" if cleaned_transcription else "pending_transcription"
         if cleaned_transcription:
             existing_emergency.status = "analyzing"
+        previous_coordinates = (existing_emergency.latitude, existing_emergency.longitude)
         if latitude is not None:
             existing_emergency.latitude = latitude
         if longitude is not None:
@@ -532,10 +620,17 @@ async def create_audio_emergency(
             existing_emergency.location_accuracy = location_accuracy
         if location_timestamp is not None:
             existing_emergency.location_timestamp = _parse_location_timestamp(location_timestamp)
-        if existing_emergency.latitude is not None and existing_emergency.longitude is not None:
-            existing_emergency.location_address = await _location_address(
-                existing_emergency.latitude,
-                existing_emergency.longitude,
+        if location_address and location_address.strip():
+            existing_emergency.location_address = location_address.strip()
+            existing_emergency.location_address_status = "reported"
+        elif (existing_emergency.latitude, existing_emergency.longitude) != previous_coordinates:
+            if existing_emergency.location_address_status == "resolved":
+                existing_emergency.location_address = None
+            existing_emergency.location_address_status = (
+                "pending"
+                if existing_emergency.latitude is not None
+                and existing_emergency.longitude is not None
+                else "unavailable"
             )
         existing_emergency.location_status = _location_status(
             existing_emergency.latitude,
@@ -577,6 +672,7 @@ async def create_audio_emergency(
                 detail="Emergency storage is temporarily unavailable",
             ) from exc
         _schedule_emergency_analysis(background_tasks, existing_emergency)
+        _schedule_location_address(background_tasks, existing_emergency)
         logger.info(
             "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
             existing_emergency.id,
@@ -586,6 +682,11 @@ async def create_audio_emergency(
         return existing_emergency
 
     status_value = "received" if cleaned_transcription else "pending_transcription"
+    address, address_status = _location_address_state(
+        latitude,
+        longitude,
+        location_address,
+    )
     emergency = EmergencyCall(
         call_type="audio",
         language=cleaned_language,
@@ -604,7 +705,8 @@ async def create_audio_emergency(
         longitude=longitude,
         location_accuracy=location_accuracy,
         location_timestamp=_parse_location_timestamp(location_timestamp),
-        location_address=await _location_address(latitude, longitude),
+        location_address=address,
+        location_address_status=address_status,
         location_status=_location_status(latitude, longitude),
         map_snapshot_file_path=snapshot_data[0] if snapshot_data else None,
         map_snapshot_filename=snapshot_data[1] if snapshot_data else None,
@@ -652,6 +754,7 @@ async def create_audio_emergency(
         ) from exc
 
     _schedule_emergency_analysis(background_tasks, emergency)
+    _schedule_location_address(background_tasks, emergency)
     logger.info(
         "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
         emergency.id,
@@ -677,6 +780,7 @@ async def create_voice_and_text_emergency(
     longitude: float | None = Form(None),
     location_accuracy: float | None = Form(None),
     location_timestamp: str | None = Form(None),
+    location_address: str | None = Form(None),
     source: str = Form("flutter"),
     priority: str = Form("normal"),
     client_metadata: str | None = Form(None),
@@ -706,6 +810,11 @@ async def create_voice_and_text_emergency(
     snapshot_data = await _save_map_snapshot(map_snapshot) if map_snapshot else None
     meta = _parse_metadata(client_metadata) or {}
     meta.setdefault("requested_language", requested_language)
+    address, address_status = _location_address_state(
+        latitude,
+        longitude,
+        location_address,
+    )
 
     emergency = EmergencyCall(
         call_type="voice_text",
@@ -725,7 +834,8 @@ async def create_voice_and_text_emergency(
         longitude=longitude,
         location_accuracy=location_accuracy,
         location_timestamp=_parse_location_timestamp(location_timestamp),
-        location_address=await _location_address(latitude, longitude),
+        location_address=address,
+        location_address_status=address_status,
         location_status=_location_status(latitude, longitude),
         map_snapshot_file_path=snapshot_data[0] if snapshot_data else None,
         map_snapshot_filename=snapshot_data[1] if snapshot_data else None,
@@ -771,6 +881,7 @@ async def create_voice_and_text_emergency(
         ) from exc
 
     _schedule_emergency_analysis(background_tasks, emergency)
+    _schedule_location_address(background_tasks, emergency)
     logger.info(
         "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
         emergency.id,
@@ -821,19 +932,70 @@ async def get_emergency_call(
 async def update_emergency_call(
     call_id: uuid.UUID,
     payload: EmergencyCallUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """Update transcription/status/metadata later without breaking clients."""
-    emergency = await db.get(EmergencyCall, call_id)
+    result = await db.execute(
+        select(EmergencyCall)
+        .where(EmergencyCall.id == call_id)
+        .with_for_update()
+    )
+    emergency = result.scalar_one_or_none()
     if not emergency:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Emergency call not found")
 
     updates = payload.model_dump(exclude_unset=True)
+    for field in (
+        "latitude",
+        "longitude",
+        "location_accuracy",
+        "location_timestamp",
+        "client_metadata",
+        "location_address",
+    ):
+        if field in updates and updates[field] is None:
+            updates.pop(field)
+
+    latitude = updates.get("latitude", emergency.latitude)
+    longitude = updates.get("longitude", emergency.longitude)
+    coordinates_updated = "latitude" in updates or "longitude" in updates
+    if coordinates_updated:
+        _validate_coordinates(
+            latitude,
+            longitude,
+            updates.get("location_accuracy", emergency.location_accuracy),
+        )
+        if (latitude is None) != (longitude is None):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="latitude and longitude must be provided together",
+            )
+
+    if "client_metadata" in updates:
+        updates["client_metadata"] = _merge_client_metadata(
+            emergency.client_metadata,
+            updates["client_metadata"],
+        )
+
+    previous_coordinates = (emergency.latitude, emergency.longitude)
     for key, value in updates.items():
         setattr(emergency, key, value)
 
+    coordinates_changed = (emergency.latitude, emergency.longitude) != previous_coordinates
+    if "location_address" in updates:
+        emergency.location_address_status = "reported"
     if "latitude" in updates or "longitude" in updates:
         emergency.location_status = _location_status(emergency.latitude, emergency.longitude)
+    if coordinates_changed and "location_address" not in updates:
+        if emergency.location_address_status == "resolved":
+            emergency.location_address = None
+        if emergency.location_address_status != "reported" and emergency.location_address_status != "unknown":
+            emergency.location_address_status = (
+                "pending"
+                if emergency.latitude is not None and emergency.longitude is not None
+                else "unavailable"
+            )
 
     if "transcription" in updates and updates["transcription"] and not emergency.text_content:
         emergency.text_content = updates["transcription"]
@@ -851,6 +1013,7 @@ async def update_emergency_call(
             detail="Emergency storage is temporarily unavailable",
         ) from exc
 
+    _schedule_location_address(background_tasks, emergency)
     return emergency
 
 
@@ -915,10 +1078,8 @@ async def get_emergency_map_snapshot(
     emergency = await db.get(EmergencyCall, call_id)
     if not emergency or not emergency.map_snapshot_file_path:
         raise HTTPException(status_code=404, detail="Map snapshot not found")
-    snapshot_path = BASE_DIR / emergency.map_snapshot_file_path
-    if not snapshot_path.exists():
-        snapshot_path = MAP_SNAPSHOT_DIR / Path(emergency.map_snapshot_file_path).name
-    if not snapshot_path.exists():
+    snapshot_path = resolve_map_snapshot_path(emergency.map_snapshot_file_path)
+    if snapshot_path is None:
         raise HTTPException(status_code=404, detail="Map snapshot file missing on disk")
     return FileResponse(
         snapshot_path,

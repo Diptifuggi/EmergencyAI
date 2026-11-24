@@ -58,13 +58,13 @@ async def analyze_without_ollama(text: str):
         (
             "Someone stole money from my bank account through an online scam.",
             "cybercrime",
-            {"cybercrime"},
+            set(),
             {"fire_service", "ambulance", "police"},
         ),
         (
             "I smell gas from my LPG cylinder.",
             "lpg",
-            {"lpg"},
+            set(),
             {"fire_service", "ambulance"},
         ),
     ],
@@ -78,8 +78,15 @@ async def test_requested_emergency_scenarios_use_evidence_only(
     assert result.analysis is not None
     assert result.analysis.emergency_type.value == emergency_type
     units = set(result.analysis.dispatch_recommendation.recommended_units)
+    help_required = {item.value for item in result.analysis.help_required}
     assert required <= units
     assert not forbidden & units
+    if emergency_type == "cybercrime":
+        assert "cybercrime" in help_required
+        assert "1930" in result.analysis.dispatch_recommendation.emergency_numbers
+    if emergency_type == "lpg":
+        assert "lpg" in help_required
+        assert "1906" in result.analysis.dispatch_recommendation.emergency_numbers
 
 
 @pytest.mark.asyncio
@@ -94,4 +101,7 @@ async def test_active_home_intrusion_has_unified_and_police_numbers() -> None:
     assert result.analysis.crime_in_progress is True
     assert result.analysis.home_intrusion is True
     assert result.analysis.burglary_in_progress is True
-    assert result.analysis.dispatch_recommendation.emergency_numbers == {"police": ["100"]}
+    assert result.analysis.dispatch_recommendation.emergency_numbers == {
+        "112": "Integrated Emergency Response",
+        "100": "Police",
+    }

@@ -4,18 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
 import { getIncident } from '@/api/incidentsApi'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
-
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow })
-
-import { SOP_ACTIONS, DEPARTMENTS } from '@/lib/constants'
+import { DEPARTMENTS } from '@/lib/constants'
+import { normalizeIncidentRecord } from '@/lib/emergencyCallNormalizer'
+import CallerLocationMap from '@/components/CallerLocationMap'
 import {
   Card,
   CardHeader,
@@ -44,6 +35,7 @@ export default function IncidentDetailPage() {
     queryFn: () => getIncident(id as string),
     enabled: Boolean(id),
   })
+  const normalizedIncident = incident ? normalizeIncidentRecord(incident) : null
   const related = { data: [] }
   const dispatches: any[] = []
   const timeline: any[] = []
@@ -67,12 +59,12 @@ export default function IncidentDetailPage() {
                 <div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xl font-semibold truncate">{incident?.title || 'Untitled'}</div>
-                      <div className="text-sm text-gray-500">{incident?.incident_type}</div>
+                      <div className="text-xl font-semibold truncate">{normalizedIncident?.title || 'Untitled'}</div>
+                      <div className="text-sm text-gray-500">{normalizedIncident?.category || 'Not reported'}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold">{incident?.severity ?? '—'}</div>
-                      <div className="text-sm">{incident?.priority || '—'}</div>
+                      <div className="text-lg font-bold">{normalizedIncident?.severityScore ?? normalizedIncident?.severityLabel ?? 'Not reported'}</div>
+                      <div className="text-sm">{normalizedIncident?.priority || 'Not reported'}</div>
                     </div>
                   </div>
                 </div>
@@ -148,9 +140,13 @@ export default function IncidentDetailPage() {
             <CardContent>
               {isLoading ? <Skeleton className="h-24" /> : (
                 <div className="text-center">
-                  <div className="text-4xl font-extrabold">{incident?.severity ?? 0} / 100</div>
-                  <div className="mt-2">Priority: {incident?.priority}</div>
-                  <div className="mt-1 text-sm text-gray-500">Calls: {incident?.call_count ?? 0}</div>
+                  <div className="text-4xl font-extrabold">
+                    {normalizedIncident?.severityScore != null
+                      ? `${normalizedIncident.severityScore} / 100`
+                      : normalizedIncident?.severityLabel || 'Not reported'}
+                  </div>
+                  <div className="mt-2">Priority: {normalizedIncident?.priority || 'Not reported'}</div>
+                  <div className="mt-1 text-sm text-gray-500">Calls: {normalizedIncident?.callCount ?? 'Not reported'}</div>
                 </div>
               )}
             </CardContent>
@@ -196,12 +192,20 @@ export default function IncidentDetailPage() {
           <Card>
             <CardHeader><CardTitle>Mini Map</CardTitle></CardHeader>
             <CardContent>
-              {incident?.latitude && incident?.longitude ? (
-                <MapContainer center={[incident.latitude, incident.longitude]} zoom={13} style={{ height: 220, width: '100%' }}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <Marker position={[incident.latitude, incident.longitude]} />
-                </MapContainer>
-              ) : <div>No location data</div>}
+              <CallerLocationMap
+                latitude={normalizedIncident?.latitude ?? null}
+                longitude={normalizedIncident?.longitude ?? null}
+                accuracy={normalizedIncident?.locationAccuracy ?? null}
+                address={normalizedIncident?.locationAddress ?? null}
+                addressStatus={normalizedIncident?.locationAddressStatus ?? 'unavailable'}
+                status={normalizedIncident?.locationStatus ?? null}
+                capturedAt={normalizedIncident?.locationTimestamp ?? null}
+                coordinateStatus={normalizedIncident?.locationCoordinatesStatus ?? 'missing'}
+                coordinatesConflict={normalizedIncident?.locationCoordinatesConflict ?? false}
+                snapshotAvailable={normalizedIncident?.mapSnapshotAvailable ?? false}
+                snapshotUrl={normalizedIncident?.mapSnapshotUrl ?? null}
+                label="Reported incident location"
+              />
             </CardContent>
           </Card>
 

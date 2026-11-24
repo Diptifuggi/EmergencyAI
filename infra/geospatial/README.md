@@ -5,8 +5,8 @@ This directory documents the intentionally separate geospatial stack. It must no
 ## Current state
 
 - FastAPI reads `NOMINATIM_URL` and defaults to `http://localhost:8080`.
+- React reads `VITE_MAP_TILE_URL` and `VITE_MAP_TILE_ATTRIBUTION`; its development default is the standard OpenStreetMap raster tile endpoint.
 - Flutter reads `MAP_TILE_URL` from `--dart-define` and defaults to a local Android-emulator tile endpoint.
-- No public Nominatim or public OSM tile URL is used by the application.
 - No India PBF has been downloaded or imported automatically.
 
 ## Safe deployment gate
@@ -25,6 +25,8 @@ For a first proof of concept, use a smaller India regional extract on a separate
 
 ## Runtime contract
 
-Start a self-hosted Nominatim service at `NOMINATIM_URL`, and a separate self-hosted tile service at `MAP_TILE_URL`. Reverse geocoding is enrichment: if Nominatim is unavailable, EmergencyIQ still stores raw GPS and completes analysis. Map tile failure affects visualization only.
+For production, configure a geocoding service and tile provider approved for the application's traffic. Public Nominatim requests are cached, serialized, and limited to at most one request per second per backend process; configure an identifying `NOMINATIM_USER_AGENT` with an operator contact before using the public service. The in-memory cache is process-local, so use a self-hosted service or shared cache for multi-worker/high-volume deployments.
 
-Provide OpenStreetMap attribution in any deployed map UI: `© OpenStreetMap contributors`.
+The React development default uses `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`; the public tile service requires a working browser network connection, normal interactive use, and visible attribution. Do not bulk-download or prefetch its tiles. If the configured tile provider is unreachable, the UI reports that state and continues to show coordinates and the independent saved snapshot.
+
+Provide the tile provider's required attribution in the map UI. For OpenStreetMap tiles use `© OpenStreetMap contributors`.

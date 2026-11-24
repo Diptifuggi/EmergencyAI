@@ -10,6 +10,8 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 import { listIncidents } from '@/api/incidentsApi'
+import { normalizeIncidentRecord } from '@/lib/emergencyCallNormalizer'
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from '@/lib/constants'
 import Loading from '@/components/common/Loading'
 import ErrorMessage from '@/components/common/ErrorMessage'
 
@@ -21,7 +23,7 @@ delete (L as any).Icon.Default.prototype._getIconUrl
   shadowUrl: markerShadow,
 })
 
-const INDIA_CENTER = [20.5937, 78.9629]
+const INDIA_CENTER: [number, number] = [20.5937, 78.9629]
 
 function createPriorityMarker(priority: any) {
   const color = priority === 'Critical' ? '#dc2626' : priority === 'Very High' ? '#f97316' : priority === 'High' ? '#f59e0b' : priority === 'Moderate' ? '#16a34a' : '#3b82f6'
@@ -33,9 +35,9 @@ function createPriorityMarker(priority: any) {
 
 function FlyToMarker({ position }: any) {
   const map = useMap()
-  if (position) {
-    map.flyTo(position, 12, { duration: 0.8 })
-  }
+  React.useEffect(() => {
+    if (position) map.flyTo(position, 12, { duration: 0.8 })
+  }, [map, position])
   return null
 }
 
@@ -43,6 +45,7 @@ export default function IncidentsMapPage() {
   const navigate = useNavigate()
   const [selectedId, setSelectedId] = React.useState<any>(null)
   const [selectedPos, setSelectedPos] = React.useState<any>(null)
+  const [tilesFailed, setTilesFailed] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState('All')
   const [searchText, setSearchText] = React.useState('')
   const { data: backendIncidents = [], isLoading, error } = useQuery({
@@ -51,21 +54,28 @@ export default function IncidentsMapPage() {
     refetchInterval: 15000,
     staleTime: 5000,
   })
-  const incidents = backendIncidents.map((incident: any) => ({
-    id: incident.id,
-    title: incident.title || 'Not available',
-    incident_type: incident.incident_type || incident.category || 'Emergency',
-    severity: incident.severity ?? '—',
-    priority: incident.priority || 'Moderate',
-    priority_color: incident.priority === 'Critical' ? 'text-red-600' : incident.priority === 'High' ? 'text-amber-500' : 'text-zinc-500',
-    status: incident.status || 'Open',
-    call_count: incident.call_count ?? 1,
-    latitude: typeof incident.latitude === 'number' && !isNaN(incident.latitude) ? incident.latitude : null,
-    longitude: typeof incident.longitude === 'number' && !isNaN(incident.longitude) ? incident.longitude : null,
-    created_at: incident.created_at ? new Date(incident.created_at).toLocaleString() : 'Not available',
-  }))
+  const incidents = [...new Map(backendIncidents.map((record: any) => {
+    const incident = normalizeIncidentRecord(record)
+    return [incident.id ?? `${incident.title}-${incident.createdAt}`, incident]
+  })).values()].map((incident: any) => {
+    const timestamp = incident.createdAt ? new Date(incident.createdAt) : null
+    const createdAt = timestamp && !Number.isNaN(timestamp.getTime())
+      ? timestamp.toLocaleString()
+      : 'Not available'
+    const priority = incident.priority || 'Not reported'
+    return {
+      ...incident,
+      title: incident.title || 'Untitled incident',
+      incident_type: incident.category || 'Not reported',
+      severity: incident.severityScore ?? incident.severityLabel,
+      priority,
+      priority_color: priority === 'Critical' ? 'text-red-600' : priority === 'High' || priority === 'Very High' ? 'text-amber-500' : 'text-zinc-500',
+      status: incident.incidentStatus || 'Not reported',
+      created_at: createdAt,
+    }
+  })
   const visibleIncidents = incidents
-    .filter((item) => activeTab === 'All' || (activeTab === 'Open' ? item.status === 'Open' : item.status === activeTab))
+    .filter((item) => activeTab === 'All' || item.status.toLowerCase() === activeTab.toLowerCase())
     .filter((item) => `${item.title} ${item.incident_type} ${item.id}`.toLowerCase().includes(searchText.toLowerCase()))
 
   if (error) return <ErrorMessage error={error} />
@@ -96,21 +106,25 @@ export default function IncidentsMapPage() {
               new Array(8).fill(0).map((_, i) => (
                 <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
               ))
+            ) : visibleIncidents.length === 0 ? (
+              <div className="rounded border border-dashed p-4 text-sm text-zinc-500">
+                {incidents.length === 0 ? 'No incident records are available.' : 'No incidents match the current filters.'}
+              </div>
             ) : (
               visibleIncidents
                 .map((inc: any) => {
-                const priority = inc.priority || 'Low'
-                const colorClass = priority === 'Critical' ? 'bg-red-600' : priority === 'Very High' ? 'bg-orange-500' : priority === 'High' ? 'bg-amber-500' : priority === 'Moderate' ? 'bg-green-500' : 'bg-blue-500'
+                const priority = inc.priority || 'Not reported'
+                const colorClass = priority === 'Critical' ? 'bg-red-600' : priority === 'Very High' ? 'bg-orange-500' : priority === 'High' ? 'bg-amber-500' : priority === 'Moderate' ? 'bg-green-500' : 'bg-zinc-400'
                 return (
                   <div key={inc.id} onClick={() => { setSelectedId(inc.id); if (inc.latitude !== null && inc.longitude !== null) { setSelectedPos([inc.latitude, inc.longitude]); } navigate(`/incidents/${inc.id}`) }} className={`flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer ${selectedId === inc.id ? 'bg-zinc-50 border-r-2 border-r-zinc-900' : ''}`}>
                     <div style={{ width: 8, height: 32, background: colorClass }} className="mr-3 rounded-sm" />
                     <div className="flex-1 min-w-0">
                       <div className="truncate font-semibold text-sm">{inc.title}</div>
-                      <div className="text-xs text-zinc-500">{inc.call_count} calls • {inc.incident_type}</div>
+                      <div className="text-xs text-zinc-500">{inc.callCount ?? 'Not reported'} calls • {inc.incident_type}</div>
                       <div className="text-xs text-zinc-400">{inc.created_at}</div>
                     </div>
                     <div className="text-right ml-3">
-                      <div className="text-lg font-bold">{inc.severity}</div>
+                      <div className="text-lg font-bold">{inc.severity == null ? 'Not reported' : inc.severity}</div>
                       <div className={`text-xs font-medium ${inc.priority_color}`}>{inc.priority}</div>
                     </div>
                   </div>
@@ -121,9 +135,14 @@ export default function IncidentsMapPage() {
         </div>
       </aside>
 
-      <main className="h-screen">
+      <main className="relative h-screen">
         <MapContainer center={INDIA_CENTER} zoom={5} style={{ height: '100%', width: '100%' }}>
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer
+            url={MAP_TILE_URL}
+            attribution={MAP_TILE_ATTRIBUTION}
+            maxZoom={19}
+            eventHandlers={{ tileerror: () => setTilesFailed(true) }}
+          />
           {visibleIncidents
             .filter((inc: any) => inc.latitude !== null && inc.longitude !== null && !isNaN(inc.latitude) && !isNaN(inc.longitude))
             .map((inc: any) => (
@@ -132,8 +151,9 @@ export default function IncidentsMapPage() {
                 <div className="w-64">
                   <div className="font-medium truncate">{inc.title}</div>
                   <div className="text-sm text-gray-600">{inc.incident_type}</div>
-                  <div className="mt-2">Calls: {inc.call_count}</div>
-                  <div className="mt-2">Severity: {inc.severity}</div>
+                  <div className="mt-2">Calls: {inc.callCount ?? 'Not reported'}</div>
+                  <div className="mt-2">Severity: {inc.severity == null ? 'Not reported' : inc.severity}</div>
+                  <div className="mt-2">Coordinates: {inc.latitude}, {inc.longitude}</div>
                   <div className="mt-3"><button onClick={() => navigate(`/incidents/${inc.id}`)} className="px-3 py-1 bg-zinc-900 text-white rounded">View Incident</button></div>
                 </div>
               </Popup>
@@ -141,6 +161,16 @@ export default function IncidentsMapPage() {
           ))}
           {selectedPos ? <FlyToMarker position={selectedPos} /> : null}
         </MapContainer>
+        {!visibleIncidents.some((incident: any) => incident.latitude !== null && incident.longitude !== null) && (
+          <div className="absolute bottom-4 left-4 z-[1000] rounded bg-white/95 p-3 text-sm text-zinc-700 shadow">
+            No incidents in this view have valid GPS coordinates.
+          </div>
+        )}
+        {tilesFailed && (
+          <div className="absolute bottom-4 right-4 z-[1000] rounded bg-white/95 p-3 text-sm text-amber-900 shadow">
+            Map tiles are unavailable. Incident records remain available in the list.
+          </div>
+        )}
       </main>
     </div>
   )

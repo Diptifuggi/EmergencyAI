@@ -46,6 +46,10 @@ from app.services.incident_rules import extract_incident_facts, services_for_fac
         ("Fire drill चल रही है", "hi", "fire_present", False),
         ("Petrol pump ke paas accident hua", "en", "location_description", "Petrol pump"),
         ("रेलवे स्टेशन के सामने हादसा हुआ", "hi", "location_description", "रेलवे स्टेशन"),
+        ("मुझे छाती में दर्द है", "hi", "location_description", None),
+        ("मुझे पेट में चोट लगी है", "hi", "location_description", None),
+        ("મને છાતીમાં દુખાવો છે", "gu", "location_description", None),
+        ("वापी में दुर्घटना हुई", "hi", "location_description", "वापी"),
     ],
 )
 def test_real_world_fact_extraction(text: str, language: str, field: str, expected: object) -> None:

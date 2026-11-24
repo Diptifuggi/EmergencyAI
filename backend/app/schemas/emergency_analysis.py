@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -83,7 +83,7 @@ class DispatchRecommendation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     recommended_units: list[str] = Field(default_factory=list, max_length=10)
-    emergency_numbers: dict[str, Any] = Field(default_factory=dict)
+    emergency_numbers: dict[str, str] = Field(default_factory=dict)
     reason: str = ""
     priority_reason: str = ""
     dispatcher_action: str = ""
@@ -95,7 +95,7 @@ class DispatchRecommendation(BaseModel):
 
 
 class EmergencyAnalysis(BaseModel):
-    """Validated final analysis; levels are derived from bounded scores."""
+    """Validated final analysis; false indicators mean evidence was not detected."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -106,12 +106,21 @@ class EmergencyAnalysis(BaseModel):
     emergency_keywords: list[str] = Field(default_factory=list, max_length=20)
     priority_score: int = Field(ge=0, le=100)
     priority_level: AnalysisLevel
-    panic_score: int = Field(ge=0, le=100)
-    panic_level: AnalysisLevel
-    stress_score: int = Field(ge=0, le=100)
-    stress_level: AnalysisLevel
+    panic_score: int | None = Field(default=None, ge=0, le=100)
+    panic_level: AnalysisLevel | None = None
+    stress_score: int | None = Field(default=None, ge=0, le=100)
+    stress_level: AnalysisLevel | None = None
     dispatch_recommendation: DispatchRecommendation
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Uncalibrated model estimate, not a validated probability; null in the "
+            "current analysis pipeline."
+        ),
+    )
+    human_confirmation_required: bool = True
     context_state: str = "current"
     current_emergency: bool = True
     hypothetical: bool = False
@@ -121,6 +130,8 @@ class EmergencyAnalysis(BaseModel):
     negated: bool = False
     victim_count: int | None = Field(default=None, ge=0)
     victim_count_approximate: bool = False
+    victim_count_source: Literal["explicit", "default", "plural_estimate", "none"] = "none"
+    priority_score_raw: int | None = None
     injuries_present: bool = False
     unconscious_person: bool = False
     severe_bleeding: bool = False
@@ -164,10 +175,14 @@ class EmergencyAnalysis(BaseModel):
 
         if self.priority_level != level_for_score(self.priority_score):
             raise ValueError("priority_level must be derived from priority_score")
-        if self.stress_level != level_for_score(self.stress_score):
+        if self.stress_score is not None and self.stress_level != level_for_score(self.stress_score):
             raise ValueError("stress_level must be derived from stress_score")
-        if self.panic_level != level_for_score(self.panic_score):
+        if self.panic_score is not None and self.panic_level != level_for_score(self.panic_score):
             raise ValueError("panic_level must be derived from panic_score")
+        if (self.stress_score is None) != (self.stress_level is None):
+            raise ValueError("stress_score and stress_level must both be available or unknown")
+        if (self.panic_score is None) != (self.panic_level is None):
+            raise ValueError("panic_score and panic_level must both be available or unknown")
         return self
 
     @field_validator("emergency_keywords")
