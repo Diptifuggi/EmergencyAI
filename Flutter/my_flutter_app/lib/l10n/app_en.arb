@@ -1,0 +1,103 @@
+{
+  "@@locale": "en",
+  "appTitle": "EmergencyIQ",
+  "bannerTagline": "EmergencyIQ Safety Hub",
+  "bannerLine1": "One app for all emergency needs",
+  "bannerLine2": "Request help anytime",
+  "bannerLine3": "Live status updates",
+  "bannerLine4": "Share location for faster help",
+  "shortcutProfile": "Profile",
+  "shortcutSosHistory": "SOS History",
+  "shortcutNotification": "Notification",
+  "shortcutAboutUs": "About Us",
+  "shortcutDial112": "Dial 112",
+  "shortcutChatUs": "Chat Us",
+  "shortcutTrackMe": "TrackMe",
+  "shortcutEmergencySos": "Emergency",
+  "sectionContactEmergencyServices": "Contact Emergency Services",
+  "servicePolice": "Police",
+  "serviceFire": "Fire",
+  "serviceMedical": "Medical",
+  "serviceDisaster": "Disaster",
+  "serviceWomen": "Woman",
+  "serviceChild": "Child",
+  "serviceElderly": "Elderly",
+  "serviceRailway": "Railway",
+  "locationOffTapToEnable": "Location off - tap to enable",
+  "locationResolving": "Resolving address...",
+  "locationUnavailable": "Location unavailable",
+  "integratedHelplineTitle": "Integrated Helpline",
+  "integratedHelplineClose": "Close",
+  "helplineDescPolice": "Police SOS provides instant help in police services.",
+  "helplineDescFire": "Fire SOS provides instant help for fire and rescue.",
+  "helplineDescMedical": "Medical SOS connects you for ambulance and medical aid.",
+  "helplineDescDisaster": "Disaster SOS alerts response teams for natural disasters.",
+  "helplineDescWomen": "Woman SOS provides dedicated safety and helpline support.",
+  "helplineDescChild": "Child SOS connects to child protection and rescue.",
+  "helplineDescElderly": "Elderly SOS provides dedicated assistance for senior citizens.",
+  "helplineDescRailway": "Railway SOS connects to railway security and assistance.",
+  "helplineDescEmergency": "Emergency SOS for any urgent situation.",
+  "sendServiceSosTitle": "Send {service} SOS",
+  "@sendServiceSosTitle": {
+    "placeholders": {
+      "service": { "type": "String" }
+    }
+  },
+  "holdToSendSos": "Hold 2s to Send SOS",
+  "callNumberBtn": "Call {number}",
+  "@callNumberBtn": {
+    "placeholders": {
+      "number": { "type": "String" }
+    }
+  },
+  "cancelBtn": "Cancel",
+  "sendingInSeconds": "Sending in {seconds}s... Tap to Cancel",
+  "@sendingInSeconds": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "sosSentConfirmed": "SOS received by server",
+  "sosQueuedOffline": "Queued offline — will retry automatically",
+  "dial112Title": "Call 112?",
+  "dial112Message": "This will open your phone dialer to call 112. EmergencyIQ does not auto-call.",
+  "dialNowBtn": "Open Dialer",
+  "drawerHome": "Home",
+  "drawerProfile": "Profile",
+  "drawerEContact": "E-Contact",
+  "drawerSosHistory": "SOS History",
+  "drawerSettings": "Settings",
+  "drawerAppInfo": "App Info",
+  "drawerTopQuestions": "Top Questions",
+  "drawerLogout": "Logout",
+  "versionLabel": "Version {version}",
+  "@versionLabel": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "logoutConfirmTitle": "Logout",
+  "logoutConfirmMessage": "Are you sure you want to log out? Clear local offline SOS queue too?",
+  "logoutKeepQueue": "Logout (Keep Queue)",
+  "logoutClearQueue": "Logout & Clear Queue",
+  "eContactTitle": "Emergency Contacts",
+  "eContactEmpty": "No emergency contacts added yet (max 5).",
+  "eContactAddBtn": "Add Contact",
+  "eContactLimitReached": "Maximum 5 emergency contacts allowed.",
+  "eContactSuggestionTitle": "Quick Add from Profile",
+  "eContactAddSuggested": "Add as emergency contact",
+  "sosHistoryTitle": "SOS History",
+  "sosHistoryEmpty": "No SOS alerts sent yet.",
+  "notificationsTitle": "Notifications",
+  "notificationsEmpty": "No notifications yet.",
+  "markAllRead": "Mark all read",
+  "trackMeTitle": "TrackMe Live Sharing",
+  "trackMeStart": "Start TrackMe",
+  "trackMeStop": "Stop Session",
+  "trackMeShareLink": "Share Link",
+  "settingsTitle": "Settings",
+  "appInfoTitle": "App Info",
+  "appInfoDisclaimer": "A successful send means our server received it. It is not confirmation that an official emergency service has been dispatched.",
+  "topQuestionsTitle": "Top Questions",
+  "aboutUsTitle": "About Us"
+}

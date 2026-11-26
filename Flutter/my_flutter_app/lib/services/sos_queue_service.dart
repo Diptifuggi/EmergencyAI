@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/network/api_client.dart';
 import 'auth_storage_service.dart';
+import 'settings_service.dart';
 import 'sos_location_service.dart';
 
 enum SosDeliveryState {
@@ -24,6 +25,8 @@ class QueuedSosAlert {
   final String id;
   final String idempotencyKey;
   final String alertType; // 'sos', 'silent_sos', 'panic_button'
+  final String serviceCategory; // 'general', 'police', 'fire', ...
+  final String categorySource; // 'user_selected'
   double? latitude;
   double? longitude;
   double? accuracyM;
@@ -38,6 +41,8 @@ class QueuedSosAlert {
     required this.id,
     required this.idempotencyKey,
     required this.alertType,
+    this.serviceCategory = 'general',
+    this.categorySource = 'user_selected',
     this.latitude,
     this.longitude,
     this.accuracyM,
@@ -53,6 +58,8 @@ class QueuedSosAlert {
         'id': id,
         'idempotency_key': idempotencyKey,
         'alert_type': alertType,
+        'service_category': serviceCategory,
+        'category_source': categorySource,
         'latitude': latitude,
         'longitude': longitude,
         'accuracy_m': accuracyM,
@@ -68,6 +75,8 @@ class QueuedSosAlert {
         id: json['id'] as String,
         idempotencyKey: json['idempotency_key'] as String,
         alertType: json['alert_type'] as String,
+        serviceCategory: json['service_category'] as String? ?? 'general',
+        categorySource: json['category_source'] as String? ?? 'user_selected',
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         accuracyM: (json['accuracy_m'] as num?)?.toDouble(),
@@ -132,6 +141,8 @@ class SosQueueService {
 
   Future<QueuedSosAlert> enqueueSos({
     required String alertType,
+    String serviceCategory = 'general',
+    String categorySource = 'user_selected',
     SosLocationFix? locationFix,
   }) async {
     final prefs = await SharedPreferences.getInstance();
@@ -151,6 +162,8 @@ class SosQueueService {
       id: generateUuid(),
       idempotencyKey: generateIdempotencyKey(),
       alertType: alertType,
+      serviceCategory: serviceCategory,
+      categorySource: categorySource,
       latitude: locationFix?.latitude,
       longitude: locationFix?.longitude,
       accuracyM: locationFix?.accuracyM,
@@ -185,6 +198,8 @@ class SosQueueService {
         'id': alert.id,
         'idempotency_key': alert.idempotencyKey,
         'alert_type': alert.alertType,
+        'service_category': alert.serviceCategory,
+        'category_source': alert.categorySource,
         'latitude': alert.latitude,
         'longitude': alert.longitude,
         'accuracy_m': alert.accuracyM,
@@ -212,9 +227,12 @@ class SosQueueService {
         await _saveAlertToQueue(alert);
         _statusController.add(alert);
 
-        // Start polling operator status and live location streaming
+        // Start polling operator status and live location streaming if enabled in settings
         _startStatusPolling(alert.id);
-        _startLiveLocationUpdates(alert.id);
+        final settings = await SettingsService.load();
+        if (settings.liveLocationEnabled) {
+          _startLiveLocationUpdates(alert.id);
+        }
       } else {
         _handleTransmissionFailure(alert);
       }
@@ -368,6 +386,16 @@ class SosQueueService {
         _dispatchAlert(alert);
       }
     }
+  }
+
+  Future<void> clearQueue() async {
+    _statusPollTimer?.cancel();
+    _liveLocationTimer?.cancel();
+    _currentActiveAlert = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_queueKey);
+    await prefs.remove(_activeAlertIdKey);
+    await prefs.remove(_lastTriggerTimeKey);
   }
 
   void dispose() {

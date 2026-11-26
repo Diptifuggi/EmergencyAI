@@ -2,11 +2,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/settings_service.dart';
 import '../services/sos_location_service.dart';
 import '../services/sos_queue_service.dart';
 
 class SosScreen extends StatefulWidget {
-  const SosScreen({super.key});
+  final String serviceCategory;
+  final String categorySource;
+
+  const SosScreen({
+    super.key,
+    this.serviceCategory = 'general',
+    this.categorySource = 'user_selected',
+  });
 
   @override
   State<SosScreen> createState() => _SosScreenState();
@@ -24,9 +32,11 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
   double _holdProgress = 0.0;
   Timer? _holdTimer;
 
-  // Cancel countdown state (5 seconds)
+  // Cancel countdown state (configurable from Settings, default 5 seconds)
   bool _inCancelCountdown = false;
   int _cancelCountdownSeconds = 5;
+  int _configuredCountdown = 5;
+  bool _vibrationEnabled = true;
   Timer? _cancelCountdownTimer;
   String? _pendingTriggerType;
 
@@ -38,11 +48,25 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
   void initState() {
     super.initState();
     _activeAlert = _queueService.currentActiveAlert;
+    _loadSettings();
     _subscription = _queueService.statusStream.listen((alert) {
       if (mounted) {
         setState(() => _activeAlert = alert);
       }
     });
+  }
+
+  Future<void> _loadSettings() async {
+    final s = await SettingsService.load();
+    if (!mounted) return;
+    setState(() {
+      _configuredCountdown = s.cancelCountdownSeconds;
+      _cancelCountdownSeconds = s.cancelCountdownSeconds;
+      _vibrationEnabled = s.vibrationEnabled;
+    });
+    if (s.silentModeDefault && _activeAlert == null && mounted) {
+      _triggerSilentSos();
+    }
   }
 
   @override
@@ -102,12 +126,12 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
   void _startCancelCountdown(String trigger) {
     setState(() {
       _inCancelCountdown = true;
-      _cancelCountdownSeconds = 5;
+      _cancelCountdownSeconds = _configuredCountdown;
       _pendingTriggerType = trigger;
     });
 
     // Sound / vibration feedback for standard SOS / Panic
-    HapticFeedback.heavyImpact();
+    if (_vibrationEnabled) HapticFeedback.heavyImpact();
 
     _cancelCountdownTimer?.cancel();
     _cancelCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -116,7 +140,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
         setState(() => _inCancelCountdown = false);
         _dispatchSos(_pendingTriggerType ?? 'sos');
       } else {
-        HapticFeedback.selectionClick();
+        if (_vibrationEnabled) HapticFeedback.selectionClick();
         setState(() {
           _cancelCountdownSeconds--;
         });
@@ -145,6 +169,8 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     final locationFix = await SosLocationService.captureLocation(promptIfDenied: false);
     await _queueService.enqueueSos(
       alertType: 'silent_sos',
+      serviceCategory: widget.serviceCategory,
+      categorySource: widget.categorySource,
       locationFix: locationFix,
     );
 
@@ -160,6 +186,8 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
 
     await _queueService.enqueueSos(
       alertType: trigger,
+      serviceCategory: widget.serviceCategory,
+      categorySource: widget.categorySource,
       locationFix: locationFix,
     );
   }
