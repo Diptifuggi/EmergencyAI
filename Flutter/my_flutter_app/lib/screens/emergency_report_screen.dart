@@ -21,7 +21,14 @@ import '../services/emergency_api_service.dart';
 import '../services/location_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/emergency_location_card.dart';
+import '../services/auth_storage_service.dart';
+import '../services/sos_location_service.dart';
+import 'edit_profile_screen.dart';
+import 'location_permission_dialog.dart';
+import 'login_screen.dart';
+import 'sos_screen.dart';
 import 'map_screen.dart';
+
 
 class EmergencyReportScreen extends StatefulWidget {
   const EmergencyReportScreen({super.key});
@@ -59,13 +66,32 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   String? _locationError;
   Uint8List? _mapSnapshot;
   String _mapSnapshotStatus = 'Map snapshot not captured';
+  bool _profileBannerDismissed = false;
+  bool _profileCompleted = true;
 
   @override
   void initState() {
     super.initState();
     _textController.addListener(_invalidateSubmissionKeys);
     _initBackendConnection();
+    _checkInitialState();
   }
+
+  Future<void> _checkInitialState() async {
+    final dismissed = await AuthStorageService.isProfileBannerDismissed();
+    final profile = await AuthStorageService.getUserProfile();
+    if (mounted) {
+      setState(() {
+        _profileBannerDismissed = dismissed;
+        _profileCompleted = profile?['profile_completed'] ?? false;
+      });
+    }
+    final perm = await SosLocationService.checkPermission();
+    if (perm == LocationPermission.denied && mounted) {
+      LocationPermissionDialog.show(context);
+    }
+  }
+
 
   @override
   void dispose() {
@@ -845,6 +871,98 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     );
   }
 
+  Widget _buildSosTriggerCard() {
+    return Card(
+      elevation: 3,
+      color: Colors.red.shade700,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SosScreen()));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Colors.white24,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.emergency, color: Colors.white, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'SOS / Silent SOS / Panic',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Instant response • No typing • Live GPS & profile',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white70, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompleteProfileBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.assignment_ind_outlined, color: Colors.amber.shade900, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Complete your emergency profile',
+                  style: TextStyle(color: Colors.amber.shade950, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                Text(
+                  'Add medical info & emergency contacts so operators receive them in an SOS.',
+                  style: TextStyle(color: Colors.amber.shade900, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+            },
+            child: const Text('Edit', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            onPressed: () async {
+              setState(() => _profileBannerDismissed = true);
+              await AuthStorageService.setProfileBannerDismissed(true);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -853,6 +971,37 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.primaryText,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Emergency Profile',
+            onPressed: () async {
+              final loggedIn = await AuthStorageService.isLoggedIn();
+              if (!mounted) return;
+              if (loggedIn) {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+              } else {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
+              }
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              icon: const Icon(Icons.warning, size: 16),
+              label: const Text('SOS', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SosScreen()));
+              },
+            ),
+          ),
+        ],
       ),
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -862,6 +1011,13 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildBackendBanner(),
+              const SizedBox(height: 12),
+              _buildSosTriggerCard(),
+              if (!_profileCompleted && !_profileBannerDismissed) ...[
+                const SizedBox(height: 12),
+                _buildCompleteProfileBanner(),
+              ],
+
               const SizedBox(height: 14),
               _buildLanguageSelector(),
               const SizedBox(height: 14),
