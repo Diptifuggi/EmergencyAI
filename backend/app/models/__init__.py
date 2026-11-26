@@ -10,7 +10,11 @@ from .sos_alert import (
     SOSAlertType,
     SOSStatus,
     SOSLocationStatus,
+    SOSServiceCategory,
 )
+from .emergency_contact import EmergencyContact
+from .user_notification import UserNotification
+from .track_session import TrackSession, TrackPoint, TrackSessionStatus
 
 __all__ = [
     "EmergencyCall",
@@ -25,4 +29,10 @@ __all__ = [
     "SOSAlertType",
     "SOSStatus",
     "SOSLocationStatus",
+    "SOSServiceCategory",
+    "EmergencyContact",
+    "UserNotification",
+    "TrackSession",
+    "TrackPoint",
+    "TrackSessionStatus",
 ]

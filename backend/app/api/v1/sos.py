@@ -13,6 +13,7 @@ from ...core.database import get_db
 from ...core.dependencies import get_current_operator, get_current_user
 from ...core.encryption import decrypt_field, decrypt_json, encrypt_json
 from ...core.rate_limit import sos_rate_limiter
+from ...models.emergency_contact import EmergencyContact
 from ...models.sos_alert import (
     SOSAlert,
     SOSAlertType,
@@ -23,6 +24,7 @@ from ...models.sos_alert import (
     SOSStatus,
 )
 from ...models.user import User
+from ...models.user_notification import UserNotification
 from ...models.user_profile import UserProfile
 from ...schemas.sos import (
     SOSActionRequest,
@@ -33,14 +35,59 @@ from ...schemas.sos import (
     SOSListItemOut,
     SOSListResponse,
     SOSLocationUpdateRequest,
+    SOSMineDetailOut,
+    SOSMineItemOut,
+    SOSMineListResponse,
     SOSStatsResponse,
     SOSStatusResponse,
 )
 from ...schemas.v1 import UserOut
+from ...services.emergency_service_directory import SERVICE_DIRECTORY
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_CATEGORY_TO_DIRECTORY_KEY = {
+    "police": "police",
+    "fire": "fire_service",
+    "medical": "ambulance",
+    "disaster": "disaster",
+    "women": "women_safety_support",
+    "child": "child_protection",
+    "elderly": "senior_citizen",
+    "railway": "railway",
+    "general": "integrated_emergency",
+}
+
+
+def get_suggested_numbers(service_category: Optional[str]) -> list[str]:
+    cat = (service_category or "general").lower()
+    if cat == "woman":
+        cat = "women"
+    key = _CATEGORY_TO_DIRECTORY_KEY.get(cat, "integrated_emergency")
+    return list(SERVICE_DIRECTORY.get(key, ["112"]))
+
+
+def _add_user_notification(
+    db: AsyncSession,
+    alert: SOSAlert,
+    notification_type: str,
+    title: str,
+    message: str,
+) -> None:
+    uid = getattr(alert, "user_id", None)
+    if not uid:
+        return
+    db.add(
+        UserNotification(
+            user_id=uid,
+            alert_id=alert.id,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+        )
+    )
 
 
 @router.post("", response_model=SOSCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -113,6 +160,8 @@ async def create_sos(
         idempotency_key=payload.idempotency_key,
         user_id=current_user.id,
         alert_type=payload.alert_type,
+        service_category=payload.service_category or "general",
+        category_source=payload.category_source or "user_selected",
         status=SOSStatus.PENDING.value,
         latitude=payload.latitude,
         longitude=payload.longitude,
@@ -147,6 +196,7 @@ async def create_sos(
         event_type="sos_created",
         payload={
             "alert_type": payload.alert_type,
+            "service_category": alert.service_category,
             "location_status": payload.location_status,
         },
         created_at=now,
@@ -228,9 +278,102 @@ async def cancel_sos(
         created_at=now,
     )
     db.add(event)
+    alert_type_label = (getattr(alert, "alert_type", None) or "sos").replace("_", " ")
+    _add_user_notification(
+        db,
+        alert,
+        "alert_cancelled",
+        "SOS Alert Cancelled",
+        f"Your {alert_type_label} alert has been cancelled.",
+    )
 
     await db.commit()
     return {"id": str(alert.id), "status": alert.status, "cancelled_at": alert.cancelled_at}
+
+
+@router.get("/mine", response_model=SOSMineListResponse)
+async def list_my_sos_alerts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SOSMineListResponse:
+    query = select(SOSAlert).where(SOSAlert.user_id == current_user.id)
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    query = (
+        query.order_by(SOSAlert.received_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    alerts = (await db.execute(query)).scalars().all()
+
+    items = [
+        SOSMineItemOut(
+            id=a.id,
+            alert_type=a.alert_type,
+            service_category=getattr(a, "service_category", None) or "general",
+            status=a.status,
+            location_status=a.location_status,
+            accuracy_m=a.accuracy_m,
+            triggered_at=a.triggered_at,
+            received_at=a.received_at,
+            acknowledged_at=a.acknowledged_at,
+            verified_at=a.verified_at,
+            closed_at=a.closed_at,
+            cancelled_at=a.cancelled_at,
+        )
+        for a in alerts
+    ]
+    return SOSMineListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/mine/{alert_id}", response_model=SOSMineDetailOut)
+async def get_my_sos_detail(
+    alert_id: UUID,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SOSMineDetailOut:
+    alert = await db.get(SOSAlert, alert_id)
+    if not alert or alert.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="SOS alert not found")
+
+    event_stmt = (
+        select(SOSEvent)
+        .where(
+            SOSEvent.alert_id == alert.id,
+            SOSEvent.event_type != "profile_accessed",
+        )
+        .order_by(SOSEvent.created_at.asc())
+    )
+    event_rows = (await db.execute(event_stmt)).scalars().all()
+    events = [
+        {
+            "id": str(e.id),
+            "actor_type": e.actor_type,
+            "event_type": e.event_type,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        }
+        for e in event_rows
+    ]
+
+    return SOSMineDetailOut(
+        id=alert.id,
+        alert_type=alert.alert_type,
+        service_category=getattr(alert, "service_category", None) or "general",
+        status=alert.status,
+        location_status=alert.location_status,
+        accuracy_m=alert.accuracy_m,
+        triggered_at=alert.triggered_at,
+        received_at=alert.received_at,
+        acknowledged_at=alert.acknowledged_at,
+        verified_at=alert.verified_at,
+        closed_at=alert.closed_at,
+        cancelled_at=alert.cancelled_at,
+        cancel_reason=alert.cancel_reason,
+        events=events,
+    )
 
 
 @router.get("/stats", response_model=SOSStatsResponse)
@@ -292,6 +435,8 @@ async def get_sos_status(
         id=alert.id,
         status=alert.status,
         alert_type=alert.alert_type,
+        service_category=getattr(alert, "service_category", None) or "general",
+        category_source=getattr(alert, "category_source", None) or "user_selected",
         triggered_at=alert.triggered_at,
         received_at=alert.received_at,
         acknowledged_at=alert.acknowledged_at,
@@ -306,6 +451,7 @@ async def get_sos_status(
 async def list_sos_alerts(
     status: Optional[str] = Query(None),
     alert_type: Optional[str] = Query(None),
+    service_category: Optional[str] = Query(None),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
     page: int = Query(1, ge=1),
@@ -319,6 +465,8 @@ async def list_sos_alerts(
         query = query.where(SOSAlert.status == status)
     if alert_type:
         query = query.where(SOSAlert.alert_type == alert_type)
+    if service_category:
+        query = query.where(SOSAlert.service_category == service_category)
     if date_from:
         query = query.where(SOSAlert.received_at >= date_from)
     if date_to:
@@ -351,6 +499,8 @@ async def list_sos_alerts(
             SOSListItemOut(
                 id=a.id,
                 alert_type=a.alert_type,
+                service_category=getattr(a, "service_category", None) or "general",
+                category_source=getattr(a, "category_source", None) or "user_selected",
                 status=a.status,
                 user_id=a.user_id,
                 user_name=user_name,
@@ -450,11 +600,37 @@ async def get_sos_detail(
         for e in event_rows
     ]
 
+    # Fetch user's emergency contacts if user_id is set
+    emergency_contacts_out = []
+    if alert.user_id:
+        ec_stmt = (
+            select(EmergencyContact)
+            .where(EmergencyContact.user_id == alert.user_id)
+            .order_by(EmergencyContact.is_primary.desc(), EmergencyContact.created_at.asc())
+        )
+        ec_rows = (await db.execute(ec_stmt)).scalars().all()
+        emergency_contacts_out = [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "phone": c.phone,
+                "relation": c.relation,
+                "notify_on_sos": c.notify_on_sos,
+                "is_primary": c.is_primary,
+            }
+            for c in ec_rows
+        ]
+
+    cat = getattr(alert, "service_category", None) or "general"
+
     return SOSDetailOut(
         id=alert.id,
         idempotency_key=alert.idempotency_key,
         user_id=alert.user_id,
         alert_type=alert.alert_type,
+        service_category=cat,
+        category_source=getattr(alert, "category_source", None) or "user_selected",
+        suggested_numbers=get_suggested_numbers(cat),
         status=alert.status,
         latitude=alert.latitude,
         longitude=alert.longitude,
@@ -474,6 +650,7 @@ async def get_sos_detail(
         cancel_reason=alert.cancel_reason,
         close_reason=alert.close_reason,
         profile_snapshot=profile_snapshot,
+        emergency_contacts=emergency_contacts_out,
         location_updates=location_updates,
         events=events,
     )
@@ -511,6 +688,13 @@ async def acknowledge_sos(
         created_at=now,
     )
     db.add(event)
+    _add_user_notification(
+        db,
+        alert,
+        "alert_acknowledged",
+        "SOS Alert Acknowledged",
+        "An EmergencyIQ operator has acknowledged your SOS alert.",
+    )
 
     await db.commit()
     return {"id": str(alert.id), "status": alert.status, "acknowledged_at": alert.acknowledged_at}
@@ -547,6 +731,13 @@ async def verify_sos(
         created_at=now,
     )
     db.add(event)
+    _add_user_notification(
+        db,
+        alert,
+        "alert_verified",
+        "SOS Alert Verified",
+        "Your SOS alert has been verified by an EmergencyIQ operator.",
+    )
 
     await db.commit()
     return {"id": str(alert.id), "status": alert.status, "verified_at": alert.verified_at}
@@ -584,6 +775,13 @@ async def close_sos(
         created_at=now,
     )
     db.add(event)
+    _add_user_notification(
+        db,
+        alert,
+        "alert_closed",
+        "SOS Alert Closed",
+        "Your SOS alert has been marked as closed.",
+    )
 
     await db.commit()
     return {"id": str(alert.id), "status": alert.status, "closed_at": alert.closed_at}
@@ -621,6 +819,13 @@ async def false_alarm_sos(
         created_at=now,
     )
     db.add(event)
+    _add_user_notification(
+        db,
+        alert,
+        "alert_false_alarm",
+        "SOS Marked False Alarm",
+        "Your SOS alert was closed as a false alarm.",
+    )
 
     await db.commit()
     return {"id": str(alert.id), "status": alert.status, "closed_at": alert.closed_at}

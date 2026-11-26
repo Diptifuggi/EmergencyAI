@@ -84,10 +84,25 @@ class UserProfileOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+VALID_SERVICE_CATEGORIES = {
+    "general",
+    "police",
+    "fire",
+    "medical",
+    "disaster",
+    "women",
+    "child",
+    "elderly",
+    "railway",
+}
+
+
 class SOSCreateRequest(BaseModel):
     id: UUID
     idempotency_key: str = Field(..., min_length=1, max_length=128)
     alert_type: Literal["sos", "silent_sos", "panic_button"]
+    service_category: Optional[str] = "general"
+    category_source: Optional[str] = "user_selected"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     accuracy_m: Optional[float] = None
@@ -97,6 +112,20 @@ class SOSCreateRequest(BaseModel):
     network_type: Optional[str] = Field(None, max_length=50)
     device_id: Optional[str] = Field(None, max_length=128)
     app_version: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("service_category")
+    @classmethod
+    def validate_service_category(cls, v: Optional[str]) -> str:
+        if not v:
+            return "general"
+        clean = v.strip().lower()
+        if clean == "woman":
+            clean = "women"
+        if clean not in VALID_SERVICE_CATEGORIES:
+            raise ValueError(
+                f"Invalid service_category '{v}'. Must be one of: {sorted(VALID_SERVICE_CATEGORIES)}"
+            )
+        return clean
 
 
 class SOSCreateResponse(BaseModel):
@@ -124,6 +153,8 @@ class SOSStatusResponse(BaseModel):
     id: UUID
     status: str
     alert_type: str
+    service_category: str = "general"
+    category_source: Optional[str] = "user_selected"
     triggered_at: datetime
     received_at: datetime
     acknowledged_at: Optional[datetime] = None
@@ -136,6 +167,8 @@ class SOSStatusResponse(BaseModel):
 class SOSListItemOut(BaseModel):
     id: UUID
     alert_type: str
+    service_category: str = "general"
+    category_source: Optional[str] = "user_selected"
     status: str
     user_id: Optional[UUID] = None
     user_name: Optional[str] = None
@@ -162,6 +195,9 @@ class SOSDetailOut(BaseModel):
     idempotency_key: str
     user_id: Optional[UUID] = None
     alert_type: str
+    service_category: str = "general"
+    category_source: Optional[str] = "user_selected"
+    suggested_numbers: List[str] = []
     status: str
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -181,6 +217,7 @@ class SOSDetailOut(BaseModel):
     cancel_reason: Optional[str] = None
     close_reason: Optional[str] = None
     profile_snapshot: Optional[Dict[str, Any]] = None
+    emergency_contacts: List[Dict[str, Any]] = []
     location_updates: List[Dict[str, Any]] = []
     events: List[Dict[str, Any]] = []
 
@@ -190,3 +227,168 @@ class SOSStatsResponse(BaseModel):
     silent_sos: int
     panic_button: int
     avg_time_to_acknowledge_seconds: Optional[float] = None
+
+
+class SOSMineItemOut(BaseModel):
+    id: UUID
+    alert_type: str
+    service_category: str = "general"
+    status: str
+    location_status: str
+    accuracy_m: Optional[float] = None
+    triggered_at: datetime
+    received_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+
+
+class SOSMineListResponse(BaseModel):
+    items: List[SOSMineItemOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class SOSMineDetailOut(BaseModel):
+    id: UUID
+    alert_type: str
+    service_category: str = "general"
+    status: str
+    location_status: str
+    accuracy_m: Optional[float] = None
+    triggered_at: datetime
+    received_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    cancel_reason: Optional[str] = None
+    events: List[Dict[str, Any]] = []
+
+
+class EmergencyContactCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    phone: str
+    relation: str = Field(..., min_length=1, max_length=50)
+    notify_on_sos: bool = True
+    is_primary: bool = False
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        norm = normalize_indian_phone(v)
+        if not norm:
+            raise ValueError("Phone number is required")
+        return norm
+
+
+class EmergencyContactUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    phone: Optional[str] = None
+    relation: Optional[str] = Field(None, min_length=1, max_length=50)
+    notify_on_sos: Optional[bool] = None
+    is_primary: Optional[bool] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        return normalize_indian_phone(v)
+
+
+class EmergencyContactOut(BaseModel):
+    id: UUID
+    name: str
+    phone: str
+    relation: str
+    notify_on_sos: bool
+    is_primary: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserNotificationOut(BaseModel):
+    id: UUID
+    alert_id: Optional[UUID] = None
+    notification_type: str
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserNotificationListResponse(BaseModel):
+    items: List[UserNotificationOut]
+    total: int
+    unread_count: int
+
+
+class UnreadCountResponse(BaseModel):
+    unread_count: int
+
+
+class TrackStartRequest(BaseModel):
+    duration_hours: Literal[1, 2, 4, 8, 12]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    accuracy_m: Optional[float] = None
+    battery_pct: Optional[int] = Field(None, ge=0, le=100)
+
+
+class TrackPointCreate(BaseModel):
+    latitude: float
+    longitude: float
+    accuracy_m: Optional[float] = None
+    battery_pct: Optional[int] = Field(None, ge=0, le=100)
+
+
+class TrackPointOut(BaseModel):
+    id: UUID
+    latitude: float
+    longitude: float
+    accuracy_m: Optional[float] = None
+    battery_pct: Optional[int] = None
+    recorded_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrackSessionOut(BaseModel):
+    id: UUID
+    share_token: str
+    duration_hours: int
+    status: str
+    started_at: datetime
+    expires_at: datetime
+    ended_at: Optional[datetime] = None
+    points: List[TrackPointOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class PublicTrackPosition(BaseModel):
+    latitude: float
+    longitude: float
+    accuracy_m: Optional[float] = None
+    recorded_at: datetime
+
+
+class PublicTrackOut(BaseModel):
+    first_name: Optional[str] = None
+    status: str
+    last_position: Optional[PublicTrackPosition] = None
+    updated_at: Optional[datetime] = None
+    expires_at: datetime
+
+
+class ReverseGeocodeResponse(BaseModel):
+    latitude: float
+    longitude: float
+    address: Optional[str] = None

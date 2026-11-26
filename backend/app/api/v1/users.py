@@ -3,17 +3,28 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
 from ...core.dependencies import get_current_user
 from ...core.encryption import decrypt_field, encrypt_field
+from ...models.emergency_contact import EmergencyContact
 from ...models.user import User
+from ...models.user_notification import UserNotification
 from ...models.user_profile import UserProfile
-from ...schemas.sos import UserProfileOut, UserProfileUpdate
+from ...schemas.sos import (
+    EmergencyContactCreate,
+    EmergencyContactOut,
+    EmergencyContactUpdate,
+    UnreadCountResponse,
+    UserNotificationListResponse,
+    UserNotificationOut,
+    UserProfileOut,
+    UserProfileUpdate,
+)
 from ...schemas.v1 import UserCreate, UserOut, UserUpdate
 from ...services.auth_service import AuthService
 
@@ -57,7 +68,6 @@ async def get_my_profile(
         profile_completed=profile.profile_completed,
         updated_at=profile.updated_at,
     )
-
 
 @router.put("/me/profile", response_model=UserProfileOut)
 async def update_my_profile(
@@ -120,6 +130,189 @@ async def update_my_profile(
         profile_completed=profile.profile_completed,
         updated_at=profile.updated_at,
     )
+
+
+@router.get("/me/emergency-contacts", response_model=list[EmergencyContactOut])
+async def list_my_emergency_contacts(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[EmergencyContactOut]:
+    stmt = (
+        select(EmergencyContact)
+        .where(EmergencyContact.user_id == current_user.id)
+        .order_by(EmergencyContact.is_primary.desc(), EmergencyContact.created_at.asc())
+    )
+    contacts = (await db.execute(stmt)).scalars().all()
+    return [EmergencyContactOut.model_validate(c) for c in contacts]
+
+
+@router.post("/me/emergency-contacts", response_model=EmergencyContactOut, status_code=status.HTTP_201_CREATED)
+async def create_my_emergency_contact(
+    payload: EmergencyContactCreate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EmergencyContactOut:
+    count_stmt = select(func.count(EmergencyContact.id)).where(
+        EmergencyContact.user_id == current_user.id
+    )
+    existing_count = (await db.execute(count_stmt)).scalar() or 0
+    if existing_count >= 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum of 5 emergency contacts allowed.",
+        )
+
+    if payload.is_primary:
+        await db.execute(
+            update(EmergencyContact)
+            .where(EmergencyContact.user_id == current_user.id)
+            .values(is_primary=False)
+        )
+
+    contact = EmergencyContact(
+        user_id=current_user.id,
+        name=payload.name.strip(),
+        phone=payload.phone,
+        relation=payload.relation.strip(),
+        notify_on_sos=payload.notify_on_sos,
+        is_primary=payload.is_primary,
+    )
+    db.add(contact)
+    await db.commit()
+    await db.refresh(contact)
+    return EmergencyContactOut.model_validate(contact)
+
+
+@router.put("/me/emergency-contacts/{contact_id}", response_model=EmergencyContactOut)
+async def update_my_emergency_contact(
+    contact_id: UUID,
+    payload: EmergencyContactUpdate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EmergencyContactOut:
+    contact = await db.get(EmergencyContact, contact_id)
+    if not contact or contact.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Emergency contact not found")
+
+    if payload.is_primary:
+        await db.execute(
+            update(EmergencyContact)
+            .where(
+                EmergencyContact.user_id == current_user.id,
+                EmergencyContact.id != contact_id,
+            )
+            .values(is_primary=False)
+        )
+
+    if payload.name is not None:
+        contact.name = payload.name.strip()
+    if payload.phone is not None:
+        contact.phone = payload.phone
+    if payload.relation is not None:
+        contact.relation = payload.relation.strip()
+    if payload.notify_on_sos is not None:
+        contact.notify_on_sos = payload.notify_on_sos
+    if payload.is_primary is not None:
+        contact.is_primary = payload.is_primary
+    contact.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(contact)
+    return EmergencyContactOut.model_validate(contact)
+
+
+@router.delete("/me/emergency-contacts/{contact_id}")
+async def delete_my_emergency_contact(
+    contact_id: UUID,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    contact = await db.get(EmergencyContact, contact_id)
+    if not contact or contact.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Emergency contact not found")
+    await db.delete(contact)
+    await db.commit()
+    return {"deleted": True, "id": str(contact_id)}
+
+
+@router.get("/me/notifications", response_model=UserNotificationListResponse)
+async def list_my_notifications(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserNotificationListResponse:
+    base_query = select(UserNotification).where(UserNotification.user_id == current_user.id)
+    total = (await db.execute(select(func.count()).select_from(base_query.subquery()))).scalar() or 0
+    unread_count = (
+        await db.execute(
+            select(func.count(UserNotification.id)).where(
+                UserNotification.user_id == current_user.id,
+                UserNotification.is_read.is_(False),
+            )
+        )
+    ).scalar() or 0
+
+    rows = (
+        await db.execute(
+            base_query.order_by(UserNotification.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).scalars().all()
+
+    return UserNotificationListResponse(
+        items=[UserNotificationOut.model_validate(n) for n in rows],
+        total=total,
+        unread_count=unread_count,
+    )
+
+
+@router.get("/me/notifications/unread-count", response_model=UnreadCountResponse)
+async def get_my_unread_notification_count(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UnreadCountResponse:
+    unread_count = (
+        await db.execute(
+            select(func.count(UserNotification.id)).where(
+                UserNotification.user_id == current_user.id,
+                UserNotification.is_read.is_(False),
+            )
+        )
+    ).scalar() or 0
+    return UnreadCountResponse(unread_count=unread_count)
+
+
+@router.post("/me/notifications/read-all")
+async def mark_all_my_notifications_read(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        update(UserNotification)
+        .where(
+            UserNotification.user_id == current_user.id,
+            UserNotification.is_read.is_(False),
+        )
+        .values(is_read=True)
+    )
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/me/notifications/{notification_id}/read")
+async def mark_my_notification_read(
+    notification_id: UUID,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    notif = await db.get(UserNotification, notification_id)
+    if not notif or notif.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.is_read = True
+    await db.commit()
+    return {"success": True, "id": str(notification_id)}
 
 
 @router.get("/", response_model=list[UserOut])

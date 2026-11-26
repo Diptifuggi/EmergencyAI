@@ -31,6 +31,18 @@ class SOSLocationStatus(str, enum.Enum):
     UNAVAILABLE = "unavailable"
 
 
+class SOSServiceCategory(str, enum.Enum):
+    GENERAL = "general"
+    POLICE = "police"
+    FIRE = "fire"
+    MEDICAL = "medical"
+    DISASTER = "disaster"
+    WOMEN = "women"
+    CHILD = "child"
+    ELDERLY = "elderly"
+    RAILWAY = "railway"
+
+
 class SOSAlert(Base):
     __tablename__ = "sos_alerts"
 
@@ -58,6 +70,21 @@ class SOSAlert(Base):
         String(30),
         nullable=False,
         index=True,
+    )
+
+    service_category = Column(
+        String(30),
+        nullable=True,
+        default=SOSServiceCategory.GENERAL.value,
+        server_default=SOSServiceCategory.GENERAL.value,
+        index=True,
+    )
+
+    category_source = Column(
+        String(30),
+        nullable=True,
+        default="user_selected",
+        server_default="user_selected",
     )
 
     status = Column(
