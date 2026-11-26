@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Bar } from 'react-chartjs-2'
 import {
@@ -20,8 +21,13 @@ import {
   Clock,
   MapPin,
   ChevronRight,
+  Siren,
+  ShieldAlert,
+  VolumeX,
 } from 'lucide-react'
 import { getAllEmergencies } from '@/api/emergencyApi'
+import { getSosStats } from '@/api/sosApi'
+
 import Loading from '@/components/common/Loading'
 import ErrorMessage from '@/components/common/ErrorMessage'
 import { buildCallMetrics, safeChartData } from '@/lib/emergencyCallNormalizer'
@@ -29,12 +35,20 @@ import { buildCallMetrics, safeChartData } from '@/lib/emergencyCallNormalizer'
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const { data: calls = [], isLoading, error } = useQuery({
     queryKey: ['emergency-calls', 'all'],
     queryFn: getAllEmergencies,
     refetchInterval: 15000,
     staleTime: 10000,
   })
+
+  const { data: sosStats } = useQuery({
+    queryKey: ['sos', 'stats'],
+    queryFn: getSosStats,
+    refetchInterval: 5000,
+  })
+
 
   if (isLoading) return <Loading />
   if (error) return <ErrorMessage error={error} />
@@ -113,7 +127,59 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Dedicated SOS Emergency Intake Cards (Not mixed into Total calls) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div
+          onClick={() => navigate('/sos')}
+          className="bg-red-500/10 border border-red-500/30 hover:border-red-500/60 rounded-xl p-4 cursor-pointer transition-all shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-red-500 uppercase tracking-wider">Active SOS</span>
+            <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white">
+              <Siren className="w-4 h-4 animate-pulse" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-red-600">
+            {sosStats?.active_sos ?? 0}
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-1">Direct citizen panic triggers • Urgent human verification</p>
+        </div>
+
+        <div
+          onClick={() => navigate('/sos?alert_type=silent_sos')}
+          className="bg-purple-500/10 border border-purple-500/30 hover:border-purple-500/60 rounded-xl p-4 cursor-pointer transition-all shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Silent SOS Today</span>
+            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
+              <VolumeX className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-purple-400">
+            {sosStats?.silent_sos ?? 0}
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-1">Discreet panic mode • No audio/visual output</p>
+        </div>
+
+        <div
+          onClick={() => navigate('/sos?alert_type=panic_button')}
+          className="bg-orange-500/10 border border-orange-500/30 hover:border-orange-500/60 rounded-xl p-4 cursor-pointer transition-all shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-orange-400 uppercase tracking-wider">Panic Button Today</span>
+            <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-white">
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-orange-400">
+            {sosStats?.panic_button ?? 0}
+          </div>
+          <p className="text-[11px] text-zinc-500 mt-1">3-second hold rapid response</p>
+        </div>
+      </div>
+
       {/* 8 Stat Cards — 4 columns, 2 rows */}
+
       <div className="grid grid-cols-4 gap-4">
         {/* Card 1: Total Calls */}
         <div className="bg-white border border-zinc-200 rounded-lg p-4 shadow-sm">

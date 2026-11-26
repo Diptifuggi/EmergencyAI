@@ -23,6 +23,9 @@ import UsersAdmin from '@/pages/admin/UsersAdmin'
 import RolesAdmin from '@/pages/admin/RolesAdmin'
 import AuditLogs from '@/pages/admin/AuditLogs'
 import NewCallDialog from '@/components/calls/NewCallDialog'
+import SosAlertsPage from '@/pages/sos/SosAlertsPage'
+import SosDetailPage from '@/pages/sos/SosDetailPage'
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,7 +51,10 @@ function AppRoutes(){
       <Route path="/" element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="sos" element={<SosAlertsPage />} />
+        <Route path="sos/:id" element={<SosDetailPage />} />
         <Route path="calls" element={<EmergencyCalls />} />
+
         <Route path="calls/:id" element={<CallViewerPage />} />
           <Route path="incidents" element={<IncidentsMapPage />} />
           <Route path="incidents (map)" element={<Navigate to="/incidents" replace />} />

@@ -3,8 +3,10 @@ import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import axiosClient from '@/api/axiosClient'
-import { LayoutDashboard, PhoneCall, MapPin, BarChart3, Users, Shield, ScrollText, LogOut } from 'lucide-react'
+import { LayoutDashboard, PhoneCall, MapPin, BarChart3, Users, Shield, ScrollText, LogOut, Siren } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { getSosStats } from '@/api/sosApi'
+
 
 function HealthDot({ healthy }: { healthy: boolean }){
   // pulsing when healthy, static red when not
@@ -15,6 +17,7 @@ function HealthDot({ healthy }: { healthy: boolean }){
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/sos', label: 'SOS Alerts', Icon: Siren },
   { to: '/calls', label: 'Live Calls', Icon: PhoneCall },
   { to: '/incidents', label: 'Incidents', Icon: MapPin },
   { to: '/analytics', label: 'Analytics', Icon: BarChart3 },
@@ -40,6 +43,14 @@ export default function Sidebar() {
     retry: false,
     initialData: false
   })
+
+  const { data: sosStats } = useQuery({
+    queryKey: ['sos', 'stats'],
+    queryFn: getSosStats,
+    refetchInterval: 5000,
+    retry: false,
+  })
+
 
   function handleLogout(){
     logout()
@@ -88,16 +99,26 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3 overflow-y-auto overflow-x-hidden">
-        {NAV_ITEMS.map(item => (
-          <NavLink key={item.to} to={item.to} className={({isActive}) =>
-            `flex items-center h-11 px-4 my-2 rounded-xl gap-3 transition-colors duration-200 ${isActive ? 'bg-[#1E1E1E] text-white border-l-2 border-white pl-3' : 'text-white/80 hover:bg-[#202020]'}`
-          }>
-            <item.Icon className="w-5 h-5 shrink-0" title={item.label} />
-            {!collapsed && <span className="min-w-0 truncate text-sm">{item.label}</span>}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(item => {
+          const isSos = item.to === '/sos'
+          const activeCount = sosStats?.active_sos || 0
+          return (
+            <NavLink key={item.to} to={item.to} className={({isActive}) =>
+              `flex items-center h-11 px-4 my-2 rounded-xl gap-3 transition-colors duration-200 ${isActive ? 'bg-[#1E1E1E] text-white border-l-2 border-white pl-3' : 'text-white/80 hover:bg-[#202020]'}`
+            }>
+              <item.Icon className={`w-5 h-5 shrink-0 ${isSos && activeCount > 0 ? 'text-red-500 animate-pulse' : ''}`} title={item.label} />
+              {!collapsed && <span className="min-w-0 truncate text-sm flex-1">{item.label}</span>}
+              {!collapsed && isSos && activeCount > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm">
+                  {activeCount}
+                </span>
+              )}
+            </NavLink>
+          )
+        })}
 
         <div className="my-3 border-t border-[#232323]" />
+
 
         {ADMIN_ITEMS.map(item => (
           <NavLink key={item.to} to={item.to} className={({isActive}) =>
