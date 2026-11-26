@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     SARVAM_STT_MODEL: str = 'saaras:v4'
     SARVAM_TIMEOUT_SECONDS: float = 60.0
 
+    PROFILE_ENCRYPTION_KEY: str = ''
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / '.env',
         env_file_encoding='utf-8',

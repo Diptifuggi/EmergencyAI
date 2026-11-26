@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Boolean, DateTime, Text, func
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
@@ -56,3 +57,6 @@ class User(Base):
         onupdate=func.now(),
         nullable=False
     )
+
+    profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
