@@ -14,6 +14,7 @@ from . import (
     dashboard,
     roles,
     audit,
+    sos,
 )
 
 api_router = APIRouter()
@@ -31,3 +32,5 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["analytic
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(roles.router, prefix="/roles", tags=["roles"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
+api_router.include_router(sos.router, prefix="/sos", tags=["sos"])
+

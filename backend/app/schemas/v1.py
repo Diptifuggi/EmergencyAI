@@ -29,6 +29,18 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=8)
+    role_name: Optional[str] = "Operator"
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    alternate_phone: Optional[str] = None
+    guardian_phone: Optional[str] = None
+    guardian_relation: Optional[str] = None
+    address: Optional[str] = None
+    age: Optional[int] = Field(None, ge=1, le=120)
+    blood_group: Optional[str] = "unknown"
+    allergies: Optional[str] = None
+    medical_history: Optional[str] = None
+    medical_consent: Optional[bool] = False
 
 
 class ChangePasswordRequest(BaseModel):

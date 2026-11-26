@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,9 @@ from ...core.database import get_db
 from ...core.security import create_access_token, create_refresh_token, verify_password, hash_password
 from ...schemas.v1 import RegisterRequest, UserOut
 from ...services.auth_service import AuthService
+from ...models.user_profile import UserProfile
+from ...core.encryption import encrypt_field
+from ...schemas.sos import normalize_indian_phone
 
 router = APIRouter()
 
@@ -66,15 +69,47 @@ async def register(
     if await AuthService.get_user_by_username(db, payload.username):
         raise HTTPException(status_code=409, detail="Username already exists")
 
+    has_allergies = bool(payload.allergies and payload.allergies.strip())
+    has_history = bool(payload.medical_history and payload.medical_history.strip())
+    if (has_allergies or has_history) and not payload.medical_consent:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Medical consent is required to save allergies or medical history",
+        )
+
     try:
         user = await AuthService.create_user(
             db,
             username=payload.username,
             email=str(payload.email),
             password=payload.password,
+            role_name=payload.role_name or "Operator",
         )
+        phone = normalize_indian_phone(payload.phone) if payload.phone else None
+        alt_phone = normalize_indian_phone(payload.alternate_phone) if payload.alternate_phone else None
+        g_phone = normalize_indian_phone(payload.guardian_phone) if payload.guardian_phone else None
+
+        profile = UserProfile(
+            user_id=user.id,
+            full_name=payload.full_name,
+            phone=phone,
+            alternate_phone=alt_phone,
+            guardian_phone=g_phone,
+            guardian_relation=payload.guardian_relation,
+            address=payload.address,
+            age=payload.age,
+            blood_group=payload.blood_group or "unknown",
+            allergies=encrypt_field(payload.allergies) if payload.medical_consent else None,
+            medical_history=encrypt_field(payload.medical_history) if payload.medical_consent else None,
+            medical_consent=bool(payload.medical_consent),
+            medical_consent_at=datetime.now(timezone.utc) if payload.medical_consent else None,
+            profile_completed=bool(payload.full_name and phone),
+        )
+        db.add(profile)
         await db.commit()
         await db.refresh(user)
+    except HTTPException:
+        raise
     except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(

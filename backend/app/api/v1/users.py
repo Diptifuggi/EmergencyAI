@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,11 +9,118 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
+from ...core.dependencies import get_current_user
+from ...core.encryption import decrypt_field, encrypt_field
 from ...models.user import User
+from ...models.user_profile import UserProfile
+from ...schemas.sos import UserProfileOut, UserProfileUpdate
 from ...schemas.v1 import UserCreate, UserOut, UserUpdate
 from ...services.auth_service import AuthService
 
 router = APIRouter()
+
+
+@router.get("/me/profile", response_model=UserProfileOut)
+async def get_my_profile(
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileOut:
+    stmt = select(UserProfile).where(UserProfile.user_id == current_user.id)
+    result = await db.execute(stmt)
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        return UserProfileOut(
+            user_id=current_user.id,
+            email=current_user.email,
+            profile_completed=False,
+            blood_group="unknown",
+            medical_consent=False,
+        )
+
+    return UserProfileOut(
+        id=profile.id,
+        user_id=profile.user_id,
+        email=current_user.email,
+        full_name=profile.full_name,
+        phone=profile.phone,
+        alternate_phone=profile.alternate_phone,
+        guardian_phone=profile.guardian_phone,
+        guardian_relation=profile.guardian_relation,
+        address=profile.address,
+        age=profile.age,
+        blood_group=profile.blood_group or "unknown",
+        allergies=decrypt_field(profile.allergies) if profile.allergies else None,
+        medical_history=decrypt_field(profile.medical_history) if profile.medical_history else None,
+        medical_consent=profile.medical_consent,
+        medical_consent_at=profile.medical_consent_at,
+        profile_completed=profile.profile_completed,
+        updated_at=profile.updated_at,
+    )
+
+
+@router.put("/me/profile", response_model=UserProfileOut)
+async def update_my_profile(
+    payload: UserProfileUpdate,
+    current_user: UserOut = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileOut:
+    stmt = select(UserProfile).where(UserProfile.user_id == current_user.id)
+    result = await db.execute(stmt)
+    profile = result.scalar_one_or_none()
+
+    if profile is None:
+        profile = UserProfile(user_id=current_user.id)
+        db.add(profile)
+
+    profile.full_name = payload.full_name
+    profile.phone = payload.phone
+    profile.alternate_phone = payload.alternate_phone
+    profile.guardian_phone = payload.guardian_phone
+    profile.guardian_relation = payload.guardian_relation
+    profile.address = payload.address
+    profile.age = payload.age
+    profile.blood_group = payload.blood_group or "unknown"
+    profile.medical_consent = payload.medical_consent
+
+    if payload.medical_consent:
+        if payload.allergies is not None:
+            profile.allergies = encrypt_field(payload.allergies)
+        if payload.medical_history is not None:
+            profile.medical_history = encrypt_field(payload.medical_history)
+        if not profile.medical_consent_at:
+            profile.medical_consent_at = datetime.now(timezone.utc)
+    else:
+        profile.allergies = None
+        profile.medical_history = None
+        profile.medical_consent_at = None
+
+    profile.profile_completed = bool(profile.full_name and profile.phone)
+    profile.updated_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return UserProfileOut(
+        id=profile.id,
+        user_id=profile.user_id,
+        email=current_user.email,
+        full_name=profile.full_name,
+        phone=profile.phone,
+        alternate_phone=profile.alternate_phone,
+        guardian_phone=profile.guardian_phone,
+        guardian_relation=profile.guardian_relation,
+        address=profile.address,
+        age=profile.age,
+        blood_group=profile.blood_group or "unknown",
+        allergies=decrypt_field(profile.allergies) if profile.allergies else None,
+        medical_history=decrypt_field(profile.medical_history) if profile.medical_history else None,
+        medical_consent=profile.medical_consent,
+        medical_consent_at=profile.medical_consent_at,
+        profile_completed=profile.profile_completed,
+        updated_at=profile.updated_at,
+    )
+
 
 @router.get("/", response_model=list[UserOut])
 async def list_users(db: AsyncSession = Depends(get_db)) -> list[UserOut]:
