@@ -1,0 +1,682 @@
+{
+  "info": {
+    "_postman_id": "a90df111-9f9b-4328-98e7-sos-alert-collection",
+    "name": "EmergencyIQ - SOS Alerts & Profiles API",
+    "description": "Comprehensive Postman collection for EmergencyIQ SOS intake, live tracking, profile snapshots, citizen actions, and operator management.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "citizen_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "operator_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sos_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_idempotency_key",
+      "value": "pm-test-key-001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Citizen Login / Token Retrieval",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Token received', function () {",
+              "    pm.expect(jsonData.access_token).to.be.a('string');",
+              "});",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('citizen_token', jsonData.access_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "username", "value": "citizen@emergencyiq.org", "type": "text" },
+            { "key": "password", "value": "Citizen@123", "type": "text" }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "2. Complete Profile (PUT /users/me/profile)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Profile is completed', function () {",
+              "    pm.expect(jsonData.profile_completed).to.eql(true);",
+              "    pm.expect(jsonData.blood_group).to.eql('O+');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"full_name\": \"Rahul Sharma\",\n  \"phone\": \"+919876543210\",\n  \"alternate_phone\": \"+919876543211\",\n  \"guardian_phone\": \"+919876543212\",\n  \"guardian_relation\": \"Parent\",\n  \"address\": \"Flat 402, Green Park Apartments, Indiranagar, Bengaluru\",\n  \"age\": 28,\n  \"blood_group\": \"O+\",\n  \"allergies\": \"Penicillin, Peanuts\",\n  \"medical_history\": \"Mild Asthma (uses inhaler)\",\n  \"medical_consent\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/users/me/profile",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "users", "me", "profile"]
+        }
+      }
+    },
+    {
+      "name": "3. Trigger SOS with GPS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201 or 200', function () {",
+              "    pm.expect([200, 201]).to.include(pm.response.code);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Alert ID present and status is pending', function () {",
+              "    pm.expect(jsonData.id).to.be.a('string');",
+              "    pm.expect(jsonData.alert_type).to.eql('sos');",
+              "});",
+              "if (jsonData.id) {",
+              "    pm.collectionVariables.set('sos_id', jsonData.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"{{test_idempotency_key}}\",\n  \"alert_type\": \"sos\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"accuracy_m\": 14.5,\n  \"location_status\": \"available\",\n  \"battery_pct\": 85,\n  \"network_type\": \"wifi\",\n  \"device_id\": \"pixel-test-device-01\",\n  \"app_version\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"]
+        }
+      }
+    },
+    {
+      "name": "4. Trigger SOS without GPS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201 or 200', function () {",
+              "    pm.expect([200, 201]).to.include(pm.response.code);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Location status is unavailable', function () {",
+              "    pm.expect(jsonData.location_status).to.eql('unavailable');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"pm-no-gps-key-002\",\n  \"alert_type\": \"sos\",\n  \"latitude\": null,\n  \"longitude\": null,\n  \"accuracy_m\": null,\n  \"location_status\": \"unavailable\",\n  \"battery_pct\": 42,\n  \"network_type\": \"cellular\",\n  \"device_id\": \"pixel-test-device-01\",\n  \"app_version\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"]
+        }
+      }
+    },
+    {
+      "name": "5. Trigger Silent SOS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201 or 200', function () {",
+              "    pm.expect([200, 201]).to.include(pm.response.code);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Alert type is silent_sos', function () {",
+              "    pm.expect(jsonData.alert_type).to.eql('silent_sos');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"pm-silent-sos-key-003\",\n  \"alert_type\": \"silent_sos\",\n  \"latitude\": 12.9720,\n  \"longitude\": 77.5950,\n  \"accuracy_m\": 10.0,\n  \"location_status\": \"available\",\n  \"battery_pct\": 65,\n  \"network_type\": \"cellular\",\n  \"device_id\": \"pixel-test-device-01\",\n  \"app_version\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"]
+        }
+      }
+    },
+    {
+      "name": "6. Trigger Panic Button",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201 or 200', function () {",
+              "    pm.expect([200, 201]).to.include(pm.response.code);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Alert type is panic_button', function () {",
+              "    pm.expect(jsonData.alert_type).to.eql('panic_button');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"pm-panic-btn-key-004\",\n  \"alert_type\": \"panic_button\",\n  \"latitude\": 12.9730,\n  \"longitude\": 77.5960,\n  \"accuracy_m\": 8.0,\n  \"location_status\": \"available\",\n  \"battery_pct\": 78,\n  \"network_type\": \"wifi\",\n  \"device_id\": \"pixel-test-device-01\",\n  \"app_version\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"]
+        }
+      }
+    },
+    {
+      "name": "7. Idempotency Test (Duplicate Key)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 on duplicate idempotency key', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Same alert ID is returned', function () {",
+              "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('sos_id'));",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"{{test_idempotency_key}}\",\n  \"alert_type\": \"sos\",\n  \"latitude\": 12.9716,\n  \"longitude\": 77.5946,\n  \"location_status\": \"available\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"]
+        }
+      }
+    },
+    {
+      "name": "8. 30-Second Deduplication Test",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 on dedup return', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Returns existing active alert', function () {",
+              "    pm.expect(jsonData.id).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idempotency_key\": \"new-key-within-30s\",\n  \"alert_type\": \"sos\",\n  \"latitude\": 12.9718,\n  \"longitude\": 77.5948,\n  \"location_status\": \"available\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"]
+        }
+      }
+    },
+    {
+      "name": "9. Stream Location Update",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Location update accepted', function () {",
+              "    pm.expect(jsonData.status).to.eql('ok');",
+              "    pm.expect(jsonData.alert_id).to.eql(pm.collectionVariables.get('sos_id'));",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"latitude\": 12.9725,\n  \"longitude\": 77.5955,\n  \"accuracy_m\": 6.2\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/{{sos_id}}/location",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "{{sos_id}}", "location"]
+        }
+      }
+    },
+    {
+      "name": "10. Cancel SOS as Citizen",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Status is now cancelled', function () {",
+              "    pm.expect(jsonData.status).to.eql('cancelled');",
+              "    pm.expect(jsonData.cancel_reason).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Mistaken trigger, I am safe now\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/{{sos_id}}/cancel",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "{{sos_id}}", "cancel"]
+        }
+      }
+    },
+    {
+      "name": "11. Operator Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Operator token received', function () {",
+              "    pm.expect(jsonData.access_token).to.be.a('string');",
+              "});",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('operator_token', jsonData.access_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "username", "value": "operator@emergencyiq.org", "type": "text" },
+            { "key": "password", "value": "Operator@123", "type": "text" }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "12. List SOS Alerts with Filter",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Items array and total returned', function () {",
+              "    pm.expect(jsonData.items).to.be.an('array');",
+              "    pm.expect(jsonData.total).to.be.a('number');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{operator_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos?status=pending&page=1&page_size=20",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos"],
+          "query": [
+            { "key": "status", "value": "pending" },
+            { "key": "page", "value": "1" },
+            { "key": "page_size", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "13. Get SOS Detail with Decrypted Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Profile snapshot decrypted in response', function () {",
+              "    pm.expect(jsonData.id).to.eql(pm.collectionVariables.get('sos_id'));",
+              "    if (jsonData.profile_snapshot) {",
+              "        pm.expect(jsonData.profile_snapshot).to.be.an('object');",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{operator_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/{{sos_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "{{sos_id}}"]
+        }
+      }
+    },
+    {
+      "name": "14. Acknowledge SOS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Status acknowledged', function () {",
+              "    pm.expect(jsonData.status).to.eql('acknowledged');",
+              "    pm.expect(jsonData.acknowledged_at).to.not.be.null;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{operator_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/{{sos_id}}/ack",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "{{sos_id}}", "ack"]
+        }
+      }
+    },
+    {
+      "name": "15. Verify SOS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Status verified', function () {",
+              "    pm.expect(jsonData.status).to.eql('verified');",
+              "    pm.expect(jsonData.verified_at).to.not.be.null;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{operator_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/{{sos_id}}/verify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "{{sos_id}}", "verify"]
+        }
+      }
+    },
+    {
+      "name": "16. Close SOS",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Status closed', function () {",
+              "    pm.expect(jsonData.status).to.eql('closed');",
+              "    pm.expect(jsonData.close_reason).to.be.a('string');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{operator_token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Field unit reached location. Medical aid provided.\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/{{sos_id}}/close",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "{{sos_id}}", "close"]
+        }
+      }
+    },
+    {
+      "name": "17. Attempt Operator Action as Citizen -> 403 Forbidden",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 403 Forbidden', function () {",
+              "    pm.response.to.have.status(403);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/stats",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "stats"]
+        }
+      }
+    },
+    {
+      "name": "18. Check SOS Stats",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Stats counters present', function () {",
+              "    pm.expect(jsonData.total_active_sos).to.be.a('number');",
+              "    pm.expect(jsonData.silent_sos_today).to.be.a('number');",
+              "    pm.expect(jsonData.panic_today).to.be.a('number');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{operator_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/sos/stats",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "sos", "stats"]
+        }
+      }
+    }
+  ]
+}
