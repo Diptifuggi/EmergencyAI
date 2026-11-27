@@ -1,0 +1,42 @@
+[
+  {
+    "q": "When should I use SOS vs Silent SOS vs Panic Button?",
+    "a": "Use Standard SOS (hold 2s, 5s cancel window) for regular emergencies. Use Silent SOS when you cannot make noise or draw attention — it sends discreetly without sound or flash. Use Panic Button (hold 3s) for immediate extreme danger."
+  },
+  {
+    "q": "What information is shared with emergency operators?",
+    "a": "Operators receive your alert type, selected service category, GPS coordinates (if available), battery/network status, and a snapshot of your EmergencyIQ profile (name, phone, emergency contacts, and medical info only if you gave consent)."
+  },
+  {
+    "q": "What happens if I trigger an SOS while offline?",
+    "a": "EmergencyIQ saves your SOS alert in a secure local queue on your device and automatically retries sending with exponential backoff as soon as internet connectivity returns. The app will never show 'sent' until the server confirms receipt."
+  },
+  {
+    "q": "How do I cancel an SOS triggered by mistake?",
+    "a": "Standard SOS and Panic Button give you a configurable countdown (default 5 seconds) to tap Cancel before sending. Even after sending, you can tap Cancel on the active SOS screen or in SOS History while it is pending."
+  },
+  {
+    "q": "How does TrackMe live location sharing work?",
+    "a": "TrackMe lets you start a timed session (1 to 12 hours) that sends your GPS location every 15-30 seconds. You receive a private link you can share via WhatsApp, SMS, or any app. Only your first name and last position are visible on the link."
+  },
+  {
+    "q": "What personal and medical data is stored?",
+    "a": "Your profile stores your name, phone numbers, address, age, blood group, allergies, and medical history. Allergies and medical history are encrypted at rest using Fernet symmetric encryption and are only decrypted when an operator opens an active SOS alert."
+  },
+  {
+    "q": "How does EmergencyIQ affect battery life?",
+    "a": "Outside active SOS or TrackMe sessions, EmergencyIQ does not run background GPS tracking. During TrackMe or an active SOS, location updates run every 15-30 seconds to balance accuracy and battery conservation."
+  },
+  {
+    "q": "Which emergency services are supported?",
+    "a": "You can route alerts or dial Police (100), Fire (101), Medical (108), Disaster (1070), Woman (181), Child (1098), Elderly (14567), Railway (139), or General Integrated Emergency (112)."
+  },
+  {
+    "q": "Which languages does EmergencyIQ support?",
+    "a": "EmergencyIQ supports English, Hindi, Gujarati, and Marathi for both the app interface and voice/text reporting."
+  },
+  {
+    "q": "Is EmergencyIQ the official Government 112 app?",
+    "a": "No. EmergencyIQ is an independent safety and triage platform. While it provides convenient shortcuts to open your phone dialer for national helpline numbers like 112, a successful SOS send confirms server receipt, not official government dispatch."
+  }
+]

@@ -216,7 +216,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
         backgroundColor: Colors.grey.shade900,
         foregroundColor: Colors.white,
       ),
-      backgroundColor: Colors.grey.shade950,
+      backgroundColor: Colors.grey.shade900,
       body: SafeArea(
         child: _inCancelCountdown ? _buildCancelCountdownUI() : _buildTriggerButtonsUI(),
       ),

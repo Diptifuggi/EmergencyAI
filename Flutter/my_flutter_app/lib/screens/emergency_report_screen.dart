@@ -6,28 +6,39 @@ import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../core/constants/emergency_services.dart';
 import '../core/language/emergency_language_option.dart';
 import '../core/language/language_mapper.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_config.dart';
+import '../l10n/app_localizations.dart';
 import '../models/emergency_call.dart';
 import '../models/emergency_location.dart';
 import '../services/emergency_api_service.dart';
+import '../services/home_feature_api_service.dart';
 import '../services/location_service.dart';
 import '../widgets/app_colors.dart';
+import '../widgets/emergency_drawer.dart';
 import '../widgets/emergency_location_card.dart';
+import '../widgets/service_sos_bottom_sheet.dart';
 import '../services/auth_storage_service.dart';
 import '../services/sos_location_service.dart';
+import 'about_us_screen.dart';
 import 'edit_profile_screen.dart';
 import 'location_permission_dialog.dart';
 import 'login_screen.dart';
+import 'notifications_screen.dart';
+import 'sos_history_screen.dart';
 import 'sos_screen.dart';
 import 'map_screen.dart';
+import 'track_me_screen.dart';
 
 
 class EmergencyReportScreen extends StatefulWidget {
@@ -69,12 +80,65 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
   bool _profileBannerDismissed = false;
   bool _profileCompleted = true;
 
+  // 112-style Home Screen state
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _textBoxKey = GlobalKey();
+  int _unreadNotifications = 0;
+  Timer? _notifPollTimer;
+  String? _resolvedAddress;
+  bool _isResolvingAddress = false;
+  bool _locationOff = false;
+
   @override
   void initState() {
     super.initState();
     _textController.addListener(_invalidateSubmissionKeys);
     _initBackendConnection();
     _checkInitialState();
+    _refreshUnreadCount();
+    _notifPollTimer = Timer.periodic(const Duration(seconds: 15), (_) => _refreshUnreadCount());
+    _refreshHomeLocationBar();
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    final count = await HomeFeatureApiService.getUnreadNotificationCount();
+    if (mounted) {
+      setState(() => _unreadNotifications = count);
+    }
+  }
+
+  Future<void> _refreshHomeLocationBar() async {
+    final cached = await HomeFeatureApiService.getCachedAddress();
+    if (mounted && cached != null && _resolvedAddress == null) {
+      setState(() => _resolvedAddress = cached);
+    }
+
+    final perm = await SosLocationService.checkPermission();
+    final enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled || perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      if (mounted) setState(() => _locationOff = true);
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _locationOff = false;
+        _isResolvingAddress = true;
+      });
+    }
+
+    final fix = await SosLocationService.captureLocation(promptIfDenied: false);
+    if (fix.latitude != null && fix.longitude != null) {
+      final addr = await HomeFeatureApiService.reverseGeocode(fix.latitude!, fix.longitude!);
+      if (mounted) {
+        setState(() {
+          _resolvedAddress = addr ?? '${fix.latitude!.toStringAsFixed(4)}, ${fix.longitude!.toStringAsFixed(4)}';
+          _isResolvingAddress = false;
+        });
+      }
+    } else if (mounted) {
+      setState(() => _isResolvingAddress = false);
+    }
   }
 
   Future<void> _checkInitialState() async {
@@ -95,6 +159,8 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
 
   @override
   void dispose() {
+    _notifPollTimer?.cancel();
+    _scrollController.dispose();
     _connectivitySub?.cancel();
     _textController.removeListener(_invalidateSubmissionKeys);
     _textController.dispose();
@@ -936,7 +1002,7 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
               children: [
                 Text(
                   'Complete your emergency profile',
-                  style: TextStyle(color: Colors.amber.shade950, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 Text(
                   'Add medical info & emergency contacts so operators receive them in an SOS.',
@@ -963,222 +1029,654 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Emergency Report'),
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.primaryText,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Emergency Profile',
-            onPressed: () async {
-              final loggedIn = await AuthStorageService.isLoggedIn();
-              if (!mounted) return;
-              if (loggedIn) {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditProfileScreen()));
-              } else {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
-              }
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  String _serviceLabel(AppLocalizations l10n, String key) {
+    switch (key) {
+      case 'police':
+        return l10n.servicePolice;
+      case 'fire':
+        return l10n.serviceFire;
+      case 'medical':
+        return l10n.serviceMedical;
+      case 'disaster':
+        return l10n.serviceDisaster;
+      case 'women':
+        return l10n.serviceWomen;
+      case 'child':
+        return l10n.serviceChild;
+      case 'elderly':
+        return l10n.serviceElderly;
+      case 'railway':
+        return l10n.serviceRailway;
+      default:
+        return key;
+    }
+  }
+
+  String _serviceDescription(AppLocalizations l10n, String key) {
+    switch (key) {
+      case 'police':
+        return l10n.helplineDescPolice;
+      case 'fire':
+        return l10n.helplineDescFire;
+      case 'medical':
+        return l10n.helplineDescMedical;
+      case 'disaster':
+        return l10n.helplineDescDisaster;
+      case 'women':
+        return l10n.helplineDescWomen;
+      case 'child':
+        return l10n.helplineDescChild;
+      case 'elderly':
+        return l10n.helplineDescElderly;
+      case 'railway':
+        return l10n.helplineDescRailway;
+      default:
+        return l10n.helplineDescEmergency;
+    }
+  }
+
+  Future<void> _showIntegratedHelplineDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.integratedHelplineTitle),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...EmergencyServicesConstants.services.map((s) {
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(s.icon, color: s.color),
+                  title: Text('${_serviceLabel(l10n, s.key)} (${s.number})'),
+                  subtitle: Text(_serviceDescription(l10n, s.key)),
+                );
+              }),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.emergency, color: Colors.red),
+                title: Text(l10n.shortcutEmergencySos),
+                subtitle: Text(l10n.helplineDescEmergency),
               ),
-              icon: const Icon(Icons.warning, size: 16),
-              label: const Text('SOS', style: TextStyle(fontWeight: FontWeight.bold)),
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SosScreen()));
-              },
-            ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.integratedHelplineClose),
           ),
         ],
       ),
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildBackendBanner(),
-              const SizedBox(height: 12),
-              _buildSosTriggerCard(),
-              if (!_profileCompleted && !_profileBannerDismissed) ...[
-                const SizedBox(height: 12),
-                _buildCompleteProfileBanner(),
-              ],
+    );
+  }
 
-              const SizedBox(height: 14),
-              _buildLanguageSelector(),
-              const SizedBox(height: 14),
-              _buildTextField(
-                label: 'Emergency text message',
-                controller: _textController,
-                keyboardType: TextInputType.multiline,
-              ),
-              if (!kIsWeb) ...[
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                    icon: Icon(_isSarvamRecording
-                      ? Icons.stop_circle_outlined
-                      : Icons.mic_none),
-                    label: Text(_isSarvamRecording
-                      ? 'Stop Listening'
-                      : 'Speak Emergency (STT)'),
-                    onPressed: _isSubmitting || _isTranscribing
-                      ? null
-                      : _isSarvamRecording
-                        ? _stopSarvamRecording
-                        : _startSarvamRecording,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                      _isSarvamRecording ? AppColors.dangerRed : AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              Row(
+  Future<void> _confirmDial112() async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.dial112Title),
+        content: Text(l10n.dial112Message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancelBtn),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.call),
+            label: Text(l10n.dialNowBtn),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final uri = Uri(scheme: 'tel', path: EmergencyServicesConstants.nationalEmergencyNumber);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildBannerCard(AppLocalizations l10n) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary, cs.primary.withValues(alpha: 0.82)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.bannerTagline,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...[
+            l10n.bannerLine1,
+            l10n.bannerLine2,
+            l10n.bannerLine3,
+            l10n.bannerLine4,
+          ].map(
+            (line) => Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Row(
                 children: [
+                  const Icon(Icons.check_circle_outline, color: Colors.white70, size: 14),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: _buildTextField(
-                      label: 'Latitude',
-                      controller: _latitudeController,
-                      keyboardType: TextInputType.number,
-                      readOnly: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildTextField(
-                      label: 'Longitude',
-                      controller: _longitudeController,
-                      keyboardType: TextInputType.number,
-                      readOnly: true,
+                    child: Text(
+                      line,
+                      style: const TextStyle(color: Colors.white, fontSize: 12.5),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.my_location),
-                label: const Text('Capture current GPS location'),
-                onPressed: _isSubmitting
-                    ? null
-                    : () async {
-                        await _locationForSubmission();
-                      },
-              ),
-              const SizedBox(height: 10),
-              if (_currentLocation != null)
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.map),
-                  label: const Text('View location on map'),
-                  onPressed: _isSubmitting
-                      ? null
-                      : () {
-                          _openCallerLocation();
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShortcutTile({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    int badgeCount = 0,
+  }) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: color.withValues(alpha: 0.14),
+                    child: Icon(icon, color: color, size: 22),
                   ),
-                ),
-              const SizedBox(height: 20),
-              _buildLocationPreview(),
-              const SizedBox(height: 4),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.send_rounded),
-                label: const Text('Submit Text Emergency'),
-                onPressed: _isSubmitting ? null : _submitTextEmergency,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Voice / Audio Report',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              if (kIsWeb)
-                const Text(
-                  'Audio recording is disabled on Web. Use native Android or iOS to submit voice emergencies.',
-                  style: TextStyle(color: Colors.orangeAccent),
-                ),
-              if (!kIsWeb) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: Icon(_isRecording
-                            ? Icons.stop_rounded
-                            : Icons.mic_rounded),
-                        label: Text(_isRecording
-                            ? 'Stop Recording'
-                            : 'Start Recording'),
-                        onPressed: _isSubmitting || _isSarvamRecording || _isTranscribing
-                            ? null
-                            : _isRecording
-                                ? _stopRecording
-                                : _startRecording,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isRecording
-                              ? AppColors.dangerRed
-                              : AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : '$badgeCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShortcutGrid(AppLocalizations l10n) {
+    final shortcuts = [
+      _buildShortcutTile(
+        icon: Icons.person_outline,
+        label: l10n.shortcutProfile,
+        color: Colors.indigo,
+        onTap: () async {
+          final loggedIn = await AuthStorageService.isLoggedIn();
+          if (!mounted) return;
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => loggedIn ? const EditProfileScreen() : const LoginScreen(),
+            ),
+          );
+        },
+      ),
+      _buildShortcutTile(
+        icon: Icons.history,
+        label: l10n.shortcutSosHistory,
+        color: Colors.teal,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SosHistoryScreen()),
+        ),
+      ),
+      _buildShortcutTile(
+        icon: Icons.notifications_outlined,
+        label: l10n.shortcutNotification,
+        color: Colors.amber.shade800,
+        badgeCount: _unreadNotifications,
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          );
+          _refreshUnreadCount();
+        },
+      ),
+      _buildShortcutTile(
+        icon: Icons.groups_outlined,
+        label: l10n.shortcutAboutUs,
+        color: Colors.blueGrey,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AboutUsScreen()),
+        ),
+      ),
+      _buildShortcutTile(
+        icon: Icons.call,
+        label: l10n.shortcutDial112,
+        color: Colors.green.shade700,
+        onTap: _confirmDial112,
+      ),
+      _buildShortcutTile(
+        icon: Icons.chat_bubble_outline,
+        label: l10n.shortcutChatUs,
+        color: Colors.blue,
+        onTap: () {
+          // TODO: Implement dedicated two-way operator chat screen
+          final ctx = _textBoxKey.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 350));
+          }
+        },
+      ),
+      _buildShortcutTile(
+        icon: Icons.share_location,
+        label: l10n.shortcutTrackMe,
+        color: Colors.deepPurple,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const TrackMeScreen()),
+        ),
+      ),
+      _buildShortcutTile(
+        icon: Icons.sos,
+        label: l10n.shortcutEmergencySos,
+        color: Colors.red,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SosScreen(serviceCategory: 'general')),
+        ),
+      ),
+    ];
+
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 4,
+      childAspectRatio: 0.92,
+      children: shortcuts,
+    );
+  }
+
+  Widget _buildServiceGrid(AppLocalizations l10n) {
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 8,
+      childAspectRatio: 0.88,
+      children: EmergencyServicesConstants.services.map((s) {
+        final label = _serviceLabel(l10n, s.key);
+        return Semantics(
+          button: true,
+          label: '$label ${s.number}',
+          child: InkWell(
+            onTap: () => ServiceSosBottomSheet.show(
+              context,
+              service: s,
+              serviceLabel: label,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: s.color.withValues(alpha: 0.25),
                 ),
-                const SizedBox(height: 12),
-                if (_audioPath != null)
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(s.icon, color: s.color, size: 26),
+                  const SizedBox(height: 5),
                   Text(
-                    'Recorded file: ${path.basename(_audioPath!)}',
-                    style: const TextStyle(fontSize: 14),
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                   ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.upload_file_rounded),
-                  label: const Text('Submit Voice + Text'),
-                  onPressed: _isSubmitting || _isTranscribing ? null : _submitAudioEmergency,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.secondaryText,
-                    foregroundColor: AppColors.primaryText,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  Text(
+                    s.number,
+                    style: TextStyle(fontSize: 10, color: s.color, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildHomeLocationBar(AppLocalizations l10n) {
+    return InkWell(
+      onTap: _locationOff
+          ? () async {
+              await SosLocationService.requestPermission();
+              await _refreshHomeLocationBar();
+            }
+          : _refreshHomeLocationBar,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _locationOff
+              ? Colors.amber.withValues(alpha: 0.14)
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _locationOff ? Colors.amber : AppColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _locationOff ? Icons.location_off : Icons.location_on,
+              color: _locationOff ? Colors.amber.shade800 : AppColors.primary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _locationOff
+                    ? l10n.locationOffTapToEnable
+                    : _isResolvingAddress && _resolvedAddress == null
+                        ? l10n.locationResolving
+                        : (_resolvedAddress ?? l10n.locationUnavailable),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+              ),
+            ),
+            IconButton(
+              icon: _isResolvingAddress
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 20),
+              onPressed: _refreshHomeLocationBar,
+              tooltip: 'Refresh location',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _build112TextAndVoiceCard(AppLocalizations l10n) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      key: _textBoxKey,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Briefly describe the situation',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+              // Compact language pill for voice/text analysis
+              DropdownButtonHideUnderline(
+                child: DropdownButton<EmergencyLanguageOption>(
+                  value: _selectedLanguage,
+                  isDense: true,
+                  style: TextStyle(fontSize: 12, color: cs.primary, fontWeight: FontWeight.w600),
+                  items: EmergencyLanguageOption.all
+                      .map((opt) => DropdownMenuItem(
+                            value: opt,
+                            child: Text(opt.displayName),
+                          ))
+                      .toList(),
+                  onChanged: _isSubmitting ? null : _onLanguageChanged,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _textController,
+            keyboardType: TextInputType.multiline,
+            minLines: 2,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: 'Type emergency details or tap the mic to speak...',
+              filled: true,
+              fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              suffixIcon: !kIsWeb
+                  ? IconButton(
+                      icon: Icon(
+                        _isSarvamRecording ? Icons.stop_circle : Icons.mic,
+                        color: _isSarvamRecording ? Colors.red : AppColors.primary,
+                        size: 26,
+                      ),
+                      tooltip: _isSarvamRecording ? 'Stop Voice Input' : 'Speak Emergency',
+                      onPressed: _isSubmitting || _isTranscribing
+                          ? null
+                          : _isSarvamRecording
+                              ? _stopSarvamRecording
+                              : _startSarvamRecording,
+                    )
+                  : null,
+            ),
+          ),
+          if (_isSarvamRecording)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Listening... Tap mic icon to stop and transcribe',
+                style: TextStyle(fontSize: 12, color: Colors.red, fontWeight: FontWeight.w600),
+              ),
+            ),
+          if (_isTranscribing)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 8),
+                  Text('Transcribing voice...', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (!kIsWeb)
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      icon: Icon(
+                        _isRecording ? Icons.stop_rounded : Icons.keyboard_voice_outlined,
+                        color: _isRecording ? Colors.red : AppColors.primary,
+                      ),
+                      label: Text(_isRecording ? 'Stop Audio' : 'Record Voice'),
+                      onPressed: _isSubmitting || _isSarvamRecording || _isTranscribing
+                          ? null
+                          : _isRecording
+                              ? _stopRecording
+                              : _startRecording,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Record audio, submit once to transcribe with Sarvam, review the transcript, then submit again.',
-                  style: TextStyle(fontSize: 12),
+              if (!kIsWeb) const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.send_rounded),
+                    label: Text(_audioPath != null ? 'Send Voice + Text' : 'Send Report'),
+                    onPressed: _isSubmitting || _isTranscribing
+                        ? null
+                        : (_audioPath != null ? _submitAudioEmergency : _submitTextEmergency),
+                  ),
                 ),
+              ),
+            ],
+          ),
+          if (_audioPath != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.audiotrack, size: 14, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Voice clip attached: ${path.basename(_audioPath!)}',
+                      style: const TextStyle(fontSize: 11.5, color: Colors.green),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _audioPath = null),
+                    child: const Icon(Icons.close, size: 16, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Scaffold(
+      drawer: EmergencyDrawer(
+        currentRoute: DrawerRouteItem.home,
+        onProfileUpdated: _checkInitialState,
+      ),
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(l10n.appTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: l10n.integratedHelplineTitle,
+            onPressed: _showIntegratedHelplineDialog,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildBannerCard(l10n),
+              const SizedBox(height: 14),
+              _buildShortcutGrid(l10n),
+              const SizedBox(height: 14),
+              Text(
+                l10n.sectionContactEmergencyServices,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              _buildServiceGrid(l10n),
+              const SizedBox(height: 14),
+              if (!_profileCompleted && !_profileBannerDismissed) ...[
+                _buildCompleteProfileBanner(),
+                const SizedBox(height: 12),
               ],
-              const SizedBox(height: 18),
-              if (_statusMessage != null)
+              _build112TextAndVoiceCard(l10n),
+              const SizedBox(height: 12),
+              _buildHomeLocationBar(l10n),
+              if (_statusMessage != null) ...[
+                const SizedBox(height: 12),
                 Text(
                   _statusMessage!,
                   style: TextStyle(
                     color: AppColors.secondaryText,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
+              ],
               if (_lastSavedCall != null) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 if (_lastSavedCall!.status == 'analyzing')
                   Align(
                     alignment: Alignment.centerRight,
