@@ -159,3 +159,35 @@ During user profile registration or editing within the Flutter application, user
    - Background hardware key interception (e.g. triple-clicking power or volume buttons while the device is locked) is restricted by Apple iOS sandbox policies. The present version requires opening the EmergencyIQ app or utilizing widget/accessibility shortcuts.
 3. **No Direct 112 / PSAP CAD Integration**:
    - SOS alerts currently route directly into the EmergencyIQ Operator Command Dashboard. Forwarding directly to national PSAP CAD (Computer-Aided Dispatch) via CAP (Common Alerting Protocol) or standard 112 interfaces will be deployed in subsequent enterprise integrations.
+
+---
+
+## 7. Home Screen, Service Categories, TrackMe & Contacts Extension
+
+### 7.1 New Database Tables & Columns
+- **`sos_alerts` Extensions**:
+  - `service_category` (`general`, `police`, `fire`, `medical`, `disaster`, `women`, `child`, `elderly`, `railway`; default `general`).
+  - `category_source` (`user_selected`; default `user_selected`). Never fed into the AI analysis or rule engine, and never overwritten.
+- **`emergency_contacts`**: Up to 5 personal contacts per citizen (`name`, `phone`, `relation`, `notify_on_sos`, `is_primary`).
+- **`user_notifications`**: Citizen alerts generated on operator status changes (`alert_acknowledged`, `alert_verified`, `alert_closed`, `alert_false_alarm`, `alert_cancelled`, `track_expired`). Contains no medical data or exact coordinates.
+- **`track_sessions` & `track_points`**: Timed live location sharing sessions (`1, 2, 4, 8, 12` hours) with unguessable `share_token` (`secrets.token_urlsafe(32)`).
+
+### 7.2 New Backend Endpoints
+- `GET /api/v1/sos/mine` & `GET /api/v1/sos/mine/{id}` (citizen history & user-visible timeline; no medical data).
+- `GET/POST/PUT/DELETE /api/v1/users/me/emergency-contacts` (max 5, Indian phone normalization).
+- `GET /api/v1/users/me/notifications`, `/unread-count`, `POST .../read`, `POST .../read-all`.
+- `POST /api/v1/track/start`, `POST /api/v1/track/{id}/points`, `POST /api/v1/track/{id}/stop`, `GET /api/v1/track/{id}`.
+- `GET /api/v1/public/track/{token}` (public read-only, rate limited, returns only `first_name`, `status`, `last_position`, `updated_at`, `expires_at`).
+- `GET /api/v1/location/reverse?lat&lon` (rate-limited wrapper around `location_service.reverse_geocode`).
+
+### 7.3 Flutter App Screens & Localization
+- **112-Style Home Screen & Drawer**: 4x2 shortcut grid, 4x2 service tiles (`Police 100`, `Fire 101`, `Medical 108`, `Disaster 1070`, `Woman 181`, `Child 1098`, `Elderly 14567`, `Railway 139`), integrated helpline dialog, and cached reverse-geocoded location bar.
+- **New Screens**: `EContactScreen`, `SosHistoryScreen`, `SosHistoryDetailScreen`, `NotificationsScreen`, `TrackMeScreen`, `SettingsScreen`, `AppInfoScreen`, `TopQuestionsScreen`, `AboutUsScreen`.
+- **Localization**: `flutter_localizations` + ARB files for `en`, `hi`, `gu`, and `mr` (`hi`/`gu`/`mr` marked `needs native review`).
+
+### 7.4 Known Limits (Extended Phase)
+- **No SMS Gateway**: Emergency contacts are displayed to operators and TrackMe links are shared via `share_plus` or user-initiated `sms:` intents; no automated SMS gateway is integrated.
+- **No Two-Way Chat Yet**: The "Chat Us" shortcut focuses the existing typed emergency report field (`TODO` noted for two-way operator chat).
+- **No Official 112 Integration**: "Dial 112" opens the native phone dialer after confirmation and never auto-calls; server receipt is not confirmation of official dispatch.
+- **Push Notifications**: Uses 15-second polling while open; Firebase Cloud Messaging push is omitted because `firebase_messaging` is not configured in the repository.
+

@@ -677,6 +677,234 @@
           "path": ["api", "v1", "sos", "stats"]
         }
       }
+    },
+    {
+      "name": "Home features",
+      "item": [
+        {
+          "name": "HF1. Trigger Fire Service SOS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"idempotency_key\": \"hf-fire-{{$timestamp}}\",\n  \"alert_type\": \"sos\",\n  \"service_category\": \"fire\",\n  \"category_source\": \"user_selected\",\n  \"latitude\": 23.0225,\n  \"longitude\": 72.5714,\n  \"location_status\": \"available\",\n  \"triggered_at\": \"2026-11-27T03:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/sos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sos"]
+            }
+          }
+        },
+        {
+          "name": "HF2. My SOS History (GET /sos/mine)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Items array returned', function () { pm.expect(pm.response.json().items).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizen_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/sos/mine?page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sos", "mine"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "page_size", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "HF3. Create Emergency Contact",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "var d = pm.response.json();",
+                  "if (d.id) pm.collectionVariables.set('contact_id', d.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Priya Sharma\",\n  \"phone\": \"9876543210\",\n  \"relation\": \"Sister\",\n  \"notify_on_sos\": true,\n  \"is_primary\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/emergency-contacts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "emergency-contacts"]
+            }
+          }
+        },
+        {
+          "name": "HF4. List Emergency Contacts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Returns array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizen_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/emergency-contacts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "emergency-contacts"]
+            }
+          }
+        },
+        {
+          "name": "HF5. Unread Notification Count",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('unread_count present', function () { pm.expect(pm.response.json().unread_count).to.be.a('number'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizen_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/notifications/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "notifications", "unread-count"]
+            }
+          }
+        },
+        {
+          "name": "HF6. Start TrackMe Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "var d = pm.response.json();",
+                  "if (d.id) pm.collectionVariables.set('track_id', d.id);",
+                  "if (d.share_token) pm.collectionVariables.set('track_token', d.share_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{citizen_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duration_hours\": 1,\n  \"latitude\": 23.0225,\n  \"longitude\": 72.5714,\n  \"accuracy_m\": 10.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/track/start",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "track", "start"]
+            }
+          }
+        },
+        {
+          "name": "HF7. Public TrackMe View (No Auth)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "var d = pm.response.json();",
+                  "pm.test('No sensitive fields exposed', function () {",
+                  "    pm.expect(d.phone).to.be.undefined;",
+                  "    pm.expect(d.address).to.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/public/track/{{track_token}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "public", "track", "{{track_token}}"]
+            }
+          }
+        },
+        {
+          "name": "HF8. Reverse Geocode Location",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Address field returned', function () { pm.expect(pm.response.json()).to.have.property('address'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{citizen_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/location/reverse?lat=23.0225&lon=72.5714",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "location", "reverse"],
+              "query": [{ "key": "lat", "value": "23.0225" }, { "key": "lon", "value": "72.5714" }]
+            }
+          }
+        }
+      ]
     }
   ]
 }
