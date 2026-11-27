@@ -25,6 +25,7 @@ import AuditLogs from '@/pages/admin/AuditLogs'
 import NewCallDialog from '@/components/calls/NewCallDialog'
 import SosAlertsPage from '@/pages/sos/SosAlertsPage'
 import SosDetailPage from '@/pages/sos/SosDetailPage'
+import PublicTrackPage from '@/pages/PublicTrackPage'
 
 
 const queryClient = new QueryClient({
@@ -47,6 +48,7 @@ function AppRoutes(){
       <Route path="/register" element={<Register />} />
       <Route path="/signup" element={<Register />} />
       <Route path="/login" element={<LoginWrapper />} />
+      <Route path="/track/:token" element={<PublicTrackPage />} />
 
       <Route path="/" element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
         <Route index element={<Navigate to="dashboard" replace />} />

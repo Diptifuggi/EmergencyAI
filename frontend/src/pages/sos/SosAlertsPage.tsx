@@ -45,6 +45,7 @@ export default function SosAlertsPage() {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
+  const [serviceFilter, setServiceFilter] = useState<string>('')
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true)
   const previousPendingIdsRef = useRef<Set<string>>(new Set())
 
@@ -62,11 +63,12 @@ export default function SosAlertsPage() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['sos', 'list', statusFilter, typeFilter],
+    queryKey: ['sos', 'list', statusFilter, typeFilter, serviceFilter],
     queryFn: () =>
       listSosAlerts({
         status: statusFilter || undefined,
         alert_type: typeFilter || undefined,
+        service_category: serviceFilter || undefined,
         page_size: 50,
       }),
     refetchInterval: 5000,
@@ -327,11 +329,29 @@ export default function SosAlertsPage() {
           <option value="false_alarm">False Alarm</option>
         </select>
 
-        {(statusFilter || typeFilter) && (
+        <select
+          value={serviceFilter}
+          onChange={(e) => setServiceFilter(e.target.value)}
+          className="bg-[#222] border border-zinc-700 text-xs text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-red-500"
+        >
+          <option value="">All Services</option>
+          <option value="general">User selected: General</option>
+          <option value="police">User selected: Police</option>
+          <option value="fire">User selected: Fire</option>
+          <option value="medical">User selected: Medical</option>
+          <option value="disaster">User selected: Disaster</option>
+          <option value="women">User selected: Women</option>
+          <option value="child">User selected: Child</option>
+          <option value="elderly">User selected: Elderly</option>
+          <option value="railway">User selected: Railway</option>
+        </select>
+
+        {(statusFilter || typeFilter || serviceFilter) && (
           <button
             onClick={() => {
               setStatusFilter('')
               setTypeFilter('')
+              setServiceFilter('')
             }}
             className="text-xs text-zinc-400 hover:text-white underline ml-2"
           >
@@ -356,6 +376,7 @@ export default function SosAlertsPage() {
                 <tr>
                   <th className="px-4 py-3">Time Received</th>
                   <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Service</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Citizen Name</th>
                   <th className="px-4 py-3">Contact</th>
@@ -380,6 +401,11 @@ export default function SosAlertsPage() {
                         {formatDateTime(alert.received_at)}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">{renderTypeBadge(alert.alert_type)}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[11px] font-medium">
+                          User selected: {((alert.service_category || 'general').charAt(0).toUpperCase() + (alert.service_category || 'general').slice(1))}
+                        </span>
+                      </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">{renderStatusBadge(alert.status)}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-white font-medium">
                         {alert.user_name || 'Anonymous Citizen'}

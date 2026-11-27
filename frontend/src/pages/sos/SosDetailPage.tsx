@@ -399,6 +399,65 @@ export default function SosDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Service Category & Suggested Helpline Numbers */}
+          <Card className="bg-[#181818] border-[#262626] shadow-lg">
+            <CardHeader className="py-3 px-4 border-b border-[#262626]">
+              <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+                <Phone className="w-4 h-4 text-indigo-400" />
+                Service & Suggested Helplines
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3 text-xs">
+              <div>
+                <span className="px-2.5 py-1 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-semibold">
+                  User selected: {((alert.service_category || 'general').charAt(0).toUpperCase() + (alert.service_category || 'general').slice(1))}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {(alert.suggested_numbers || ['112']).map((num: string) => (
+                  <a
+                    key={num}
+                    href={`tel:${num}`}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600/20 text-emerald-300 border border-emerald-600/40 rounded font-bold hover:bg-emerald-600/30"
+                  >
+                    <Phone className="w-3 h-3" /> {num}
+                  </a>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* User Emergency Contacts */}
+          {alert.emergency_contacts && alert.emergency_contacts.length > 0 && (
+            <Card className="bg-[#181818] border-[#262626] shadow-lg">
+              <CardHeader className="py-3 px-4 border-b border-[#262626]">
+                <CardTitle className="text-sm font-semibold text-white flex items-center gap-2">
+                  <User className="w-4 h-4 text-blue-400" />
+                  Emergency Contacts ({alert.emergency_contacts.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-2.5 text-xs">
+                {alert.emergency_contacts.map((ec: any) => (
+                  <div key={ec.id} className="flex items-center justify-between border-b border-[#262626] pb-2 last:border-none last:pb-0">
+                    <div>
+                      <p className="text-white font-semibold">
+                        {ec.name} {ec.is_primary && <span className="text-[10px] text-amber-400 ml-1">(Primary)</span>}
+                      </p>
+                      <p className="text-zinc-400">{ec.relation}</p>
+                    </div>
+                    <a
+                      href={`tel:${ec.phone}`}
+                      className="inline-flex items-center gap-1 text-emerald-400 hover:underline font-mono"
+                    >
+                      <Phone className="w-3 h-3" />
+                      {ec.phone}
+                    </a>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Medical Details Card */}
           <Card className="bg-[#181818] border-[#262626] shadow-lg">
             <CardHeader className="py-3 px-4 border-b border-[#262626]">

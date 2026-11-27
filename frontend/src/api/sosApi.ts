@@ -4,6 +4,8 @@ import axiosClient from './axiosClient'
 export interface SOSListItem {
   id: string
   alert_type: 'sos' | 'silent_sos' | 'panic_button'
+  service_category?: string
+  category_source?: string
   status: 'pending' | 'acknowledged' | 'verified' | 'cancelled' | 'closed' | 'false_alarm'
   user_id?: string
   user_name?: string
@@ -55,6 +57,9 @@ export interface SOSDetail {
   idempotency_key: string
   user_id?: string
   alert_type: 'sos' | 'silent_sos' | 'panic_button'
+  service_category?: string
+  category_source?: string
+  suggested_numbers?: string[]
   status: 'pending' | 'acknowledged' | 'verified' | 'cancelled' | 'closed' | 'false_alarm'
   latitude?: number
   longitude?: number
@@ -74,6 +79,14 @@ export interface SOSDetail {
   cancel_reason?: string
   close_reason?: string
   profile_snapshot?: ProfileSnapshot
+  emergency_contacts?: Array<{
+    id: string
+    name: string
+    phone: string
+    relation: string
+    notify_on_sos: boolean
+    is_primary: boolean
+  }>
   location_updates: Array<{
     id: string
     latitude: number
@@ -99,10 +112,29 @@ export async function getSosStats(): Promise<SOSStats> {
 export async function listSosAlerts(params: {
   status?: string
   alert_type?: string
+  service_category?: string
   page?: number
   page_size?: number
 } = {}): Promise<SOSListResponse> {
   const resp = await axiosClient.get<SOSListResponse>('/sos', { params })
+  return resp.data
+}
+
+export interface PublicTrackData {
+  first_name?: string
+  status: 'active' | 'ended' | 'expired'
+  last_position?: {
+    latitude: number
+    longitude: number
+    accuracy_m?: number
+    recorded_at: string
+  }
+  updated_at?: string
+  expires_at: string
+}
+
+export async function getPublicTrack(token: string): Promise<PublicTrackData> {
+  const resp = await axiosClient.get<PublicTrackData>(`/public/track/${token}`)
   return resp.data
 }
 
