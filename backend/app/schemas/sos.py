@@ -338,21 +338,34 @@ class UnreadCountResponse(BaseModel):
 
 class TrackStartRequest(BaseModel):
     duration_hours: Literal[1, 2, 4, 8, 12]
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    accuracy_m: Optional[float] = None
+    share_with_control_room: bool = False
+    sos_alert_id: Optional[UUID] = None
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    accuracy_m: Optional[float] = Field(None, ge=0.0)
     battery_pct: Optional[int] = Field(None, ge=0, le=100)
 
 
 class TrackPointCreate(BaseModel):
-    latitude: float
-    longitude: float
-    accuracy_m: Optional[float] = None
+    client_point_id: Optional[str] = Field(None, max_length=64)
+    latitude: float = Field(..., ge=-90.0, le=90.0)
+    longitude: float = Field(..., ge=-180.0, le=180.0)
+    accuracy_m: Optional[float] = Field(None, ge=0.0)
     battery_pct: Optional[int] = Field(None, ge=0, le=100)
+    recorded_at: Optional[datetime] = None
+
+
+class TrackPointBatchCreate(BaseModel):
+    points: List[TrackPointCreate] = Field(..., min_length=1, max_length=50)
+
+
+class TrackAttachSOSRequest(BaseModel):
+    sos_alert_id: UUID
 
 
 class TrackPointOut(BaseModel):
     id: UUID
+    client_point_id: Optional[str] = None
     latitude: float
     longitude: float
     accuracy_m: Optional[float] = None
@@ -366,10 +379,13 @@ class TrackSessionOut(BaseModel):
     id: UUID
     share_token: str
     duration_hours: int
+    share_with_control_room: bool = False
+    sos_alert_id: Optional[UUID] = None
     status: str
     started_at: datetime
     expires_at: datetime
     ended_at: Optional[datetime] = None
+    distance_meters: float = 0.0
     points: List[TrackPointOut] = []
 
     model_config = {"from_attributes": True}

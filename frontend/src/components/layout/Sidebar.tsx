@@ -3,7 +3,7 @@ import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import axiosClient from '@/api/axiosClient'
-import { LayoutDashboard, PhoneCall, MapPin, BarChart3, Users, Shield, ScrollText, LogOut, Siren } from 'lucide-react'
+import { LayoutDashboard, PhoneCall, MapPin, BarChart3, Users, Shield, ScrollText, LogOut, Siren, Navigation } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { getSosStats } from '@/api/sosApi'
 
@@ -18,6 +18,7 @@ function HealthDot({ healthy }: { healthy: boolean }){
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { to: '/sos', label: 'SOS Alerts', Icon: Siren },
+  { to: '/live-tracking', label: 'Live Tracking', Icon: Navigation },
   { to: '/calls', label: 'Live Calls', Icon: PhoneCall },
   { to: '/incidents', label: 'Incidents', Icon: MapPin },
   { to: '/analytics', label: 'Analytics', Icon: BarChart3 },

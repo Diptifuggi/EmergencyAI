@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -39,6 +39,18 @@ class TrackSession(Base):
     )
 
     duration_hours = Column(Integer, nullable=False)
+    share_with_control_room = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    sos_alert_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("sos_alerts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     status = Column(
         String(30),
         nullable=False,
@@ -71,6 +83,9 @@ class TrackSession(Base):
 
 class TrackPoint(Base):
     __tablename__ = "track_points"
+    __table_args__ = (
+        UniqueConstraint("session_id", "client_point_id", name="uq_track_point_client_id"),
+    )
 
     id = Column(
         UUID(as_uuid=True),
@@ -85,6 +100,7 @@ class TrackPoint(Base):
         index=True,
     )
 
+    client_point_id = Column(String(64), nullable=True)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
     accuracy_m = Column(Float, nullable=True)

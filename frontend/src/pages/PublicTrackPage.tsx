@@ -1,14 +1,15 @@
 // @ts-nocheck
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { MapPin, Clock, ShieldAlert, CheckCircle2 } from 'lucide-react'
+import { MapPin, Clock, ShieldAlert, CheckCircle2, AlertTriangle } from 'lucide-react'
 
 import { getPublicTrack } from '@/api/sosApi'
-import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from '@/lib/constants'
+import { API_BASE_URL, MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from '@/lib/constants'
+import { formatIST } from '@/lib/formatters'
 
 const trackMarkerIcon = L.divIcon({
   html: `<div style="background-color:#7c3aed;width:20px;height:20px;border-radius:50%;border:3px solid #ffffff;box-shadow:0 0 10px #7c3aed;"></div>`,
@@ -19,13 +20,29 @@ const trackMarkerIcon = L.divIcon({
 
 export default function PublicTrackPage() {
   const { token } = useParams<{ token: string }>()
+  const queryClient = useQueryClient()
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['public-track', token],
     queryFn: () => getPublicTrack(token!),
     enabled: !!token,
-    refetchInterval: 10000,
+    refetchInterval: 4000,
   })
+
+  useEffect(() => {
+    if (!token) return
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + `/public/track/ws/${encodeURIComponent(token)}`
+    let ws: WebSocket | null = null
+    try {
+      ws = new WebSocket(wsUrl)
+      ws.onmessage = () => {
+        queryClient.invalidateQueries({ queryKey: ['public-track', token] })
+      }
+    } catch {}
+    return () => {
+      try { ws?.close() } catch {}
+    }
+  }, [token, queryClient])
 
   if (isLoading) {
     return (
@@ -49,6 +66,8 @@ export default function PublicTrackPage() {
 
   const isEnded = data.status === 'ended' || data.status === 'expired'
   const pos = data.last_position
+  const lastMs = pos?.recorded_at ? new Date(pos.recorded_at).getTime() : 0
+  const isStale = !isEnded && lastMs > 0 && Date.now() - lastMs > 120000
 
   return (
     <div className="min-h-screen bg-[#111] text-white flex flex-col">
@@ -61,7 +80,7 @@ export default function PublicTrackPage() {
             </h1>
             <p className="text-xs text-zinc-400 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" />
-              Last updated: {data.updated_at ? new Date(data.updated_at).toLocaleString() : 'N/A'}
+              Last updated: {formatIST(data.updated_at)}
             </p>
           </div>
         </div>
@@ -77,6 +96,13 @@ export default function PublicTrackPage() {
           )}
         </div>
       </header>
+
+      {isStale && (
+        <div className="bg-amber-500/20 border-b border-amber-500/40 px-6 py-2 text-center text-xs text-amber-200 font-medium flex items-center justify-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          No update for 2+ minutes — awaiting GPS signal.
+        </div>
+      )}
 
       {isEnded && (
         <div className="bg-amber-500/15 border-b border-amber-500/30 px-6 py-2.5 text-center text-xs text-amber-300 font-medium">

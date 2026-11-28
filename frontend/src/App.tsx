@@ -28,6 +28,7 @@ import SosDetailPage from '@/pages/sos/SosDetailPage'
 import PublicTrackPage from '@/pages/PublicTrackPage'
 import UnauthorizedPage from '@/pages/UnauthorizedPage'
 import UserDetailPage from '@/pages/users/UserDetailPage'
+import LiveTrackingPage from '@/pages/track/LiveTrackingPage'
 
 
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ function AppRoutes(){
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="sos" element={<SosAlertsPage />} />
         <Route path="sos/:id" element={<SosDetailPage />} />
+        <Route path="live-tracking" element={<LiveTrackingPage />} />
         <Route path="users/:id" element={<UserDetailPage />} />
         <Route path="calls" element={<EmergencyCalls />} />
 

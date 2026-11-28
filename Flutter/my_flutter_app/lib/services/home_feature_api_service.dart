@@ -142,6 +142,8 @@ class HomeFeatureApiService {
   // --- TrackMe ---
   static Future<Map<String, dynamic>> startTrackSession({
     required int durationHours,
+    bool shareWithControlRoom = false,
+    String? sosAlertId,
     double? latitude,
     double? longitude,
     double? accuracyM,
@@ -150,6 +152,8 @@ class HomeFeatureApiService {
       '/api/v1/track/start',
       body: jsonEncode({
         'duration_hours': durationHours,
+        'share_with_control_room': shareWithControlRoom,
+        if (sosAlertId != null) 'sos_alert_id': sosAlertId,
         'latitude': latitude,
         'longitude': longitude,
         'accuracy_m': accuracyM,
@@ -161,18 +165,42 @@ class HomeFeatureApiService {
     throw Exception('Failed to start TrackMe (${resp.statusCode})');
   }
 
+  static Future<bool> sendTrackPointsBatch(
+    String sessionId,
+    List<Map<String, dynamic>> points,
+  ) async {
+    final resp = await AuthHttpClient.post(
+      '/api/v1/track/$sessionId/points',
+      body: jsonEncode({'points': points}),
+      timeout: const Duration(seconds: 10),
+    );
+    return resp.statusCode == 200;
+  }
+
+  static Future<void> attachSosToTrackSession(String sessionId, String sosAlertId) async {
+    await AuthHttpClient.post(
+      '/api/v1/track/$sessionId/attach-sos',
+      body: jsonEncode({'sos_alert_id': sosAlertId}),
+      timeout: const Duration(seconds: 10),
+    );
+  }
+
   static Future<void> sendTrackPoint(
     String sessionId, {
     required double latitude,
     required double longitude,
     double? accuracyM,
+    String? clientPointId,
+    DateTime? recordedAt,
   }) async {
     await AuthHttpClient.post(
       '/api/v1/track/$sessionId/points',
       body: jsonEncode({
+        if (clientPointId != null) 'client_point_id': clientPointId,
         'latitude': latitude,
         'longitude': longitude,
         'accuracy_m': accuracyM,
+        if (recordedAt != null) 'recorded_at': recordedAt.toUtc().toIso8601String(),
       }),
       timeout: const Duration(seconds: 10),
     );

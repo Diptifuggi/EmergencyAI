@@ -138,6 +138,16 @@ export async function getPublicTrack(token: string): Promise<PublicTrackData> {
   return resp.data
 }
 
+export async function listOperatorTrackSessions(): Promise<{ items: any[] }> {
+  const resp = await axiosClient.get('/track/operator/active')
+  return resp.data
+}
+
+export async function getOperatorTrackDetail(sessionId: string): Promise<any> {
+  const resp = await axiosClient.get(`/track/operator/${sessionId}`)
+  return resp.data
+}
+
 export async function getSosDetail(id: string): Promise<SOSDetail> {
   const resp = await axiosClient.get<SOSDetail>(`/sos/${id}`)
   return resp.data

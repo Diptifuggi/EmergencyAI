@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
 from ...core.rate_limit import sos_rate_limiter
+from ...core.ws_manager import ws_manager
 from ...models.track_session import TrackPoint, TrackSession, TrackSessionStatus
 from ...models.user import User
 from ...models.user_profile import UserProfile
@@ -74,3 +75,13 @@ async def get_public_track_session(
         updated_at=last_pt.recorded_at if last_pt else session.started_at,
         expires_at=session.expires_at,
     )
+
+
+@router.websocket("/track/ws/{token}")
+async def public_track_ws(websocket: WebSocket, token: str):
+    await ws_manager.connect(f"track:{token}", websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await ws_manager.disconnect(f"track:{token}", websocket)
