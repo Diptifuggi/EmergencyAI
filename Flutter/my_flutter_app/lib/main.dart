@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/network/api_client.dart';
+import 'core/network/auth_http_client.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/emergency_report_screen.dart';
 import 'services/settings_service.dart';
@@ -22,6 +23,7 @@ class EmergencyIqApp extends StatelessWidget {
       valueListenable: SettingsService.localeNotifier,
       builder: (context, locale, _) {
         return MaterialApp(
+          navigatorKey: AuthHttpClient.navigatorKey,
           title: 'EmergencyIQ',
           debugShowCheckedModeBanner: false,
           locale: locale,

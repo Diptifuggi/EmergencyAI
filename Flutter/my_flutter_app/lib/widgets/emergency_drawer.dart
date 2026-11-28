@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../core/network/auth_http_client.dart';
 import '../l10n/app_localizations.dart';
 import '../screens/about_us_screen.dart';
 import '../screens/app_info_screen.dart';
@@ -94,6 +96,13 @@ class _EmergencyDrawerState extends State<EmergencyDrawer> {
     );
 
     if (choice == null || choice == 'cancel') return;
+    try {
+      final rt = await AuthStorageService.getRefreshToken();
+      await AuthHttpClient.post(
+        '/api/v1/auth/logout',
+        body: jsonEncode({'refresh_token': rt}),
+      );
+    } catch (_) {}
     if (choice == 'clear') {
       await SosQueueService().clearQueue();
     }

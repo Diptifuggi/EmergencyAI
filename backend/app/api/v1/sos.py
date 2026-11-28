@@ -10,9 +10,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
-from ...core.dependencies import get_current_operator, get_current_user
+from ...core.dependencies import get_current_citizen, get_current_operator, get_current_user
 from ...core.encryption import decrypt_field, decrypt_json, encrypt_json
 from ...core.rate_limit import sos_rate_limiter
+from .audit import record_audit_log
 from ...models.emergency_contact import EmergencyContact
 from ...models.sos_alert import (
     SOSAlert,
@@ -94,7 +95,7 @@ def _add_user_notification(
 async def create_sos(
     payload: SOSCreateRequest,
     response: Response,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> SOSCreateResponse:
     # 1. Rate limiting per user
@@ -218,7 +219,7 @@ async def create_sos(
 async def update_sos_location(
     alert_id: UUID,
     payload: SOSLocationUpdateRequest,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ):
     sos_rate_limiter.check_min_interval(f"loc_{alert_id}", min_interval_seconds=3.0)
@@ -256,7 +257,7 @@ async def update_sos_location(
 async def cancel_sos(
     alert_id: UUID,
     payload: SOSCancelRequest,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ):
     alert = await db.get(SOSAlert, alert_id)
@@ -295,7 +296,7 @@ async def cancel_sos(
 async def list_my_sos_alerts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> SOSMineListResponse:
     query = select(SOSAlert).where(SOSAlert.user_id == current_user.id)
@@ -332,7 +333,7 @@ async def list_my_sos_alerts(
 @router.get("/mine/{alert_id}", response_model=SOSMineDetailOut)
 async def get_my_sos_detail(
     alert_id: UUID,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> SOSMineDetailOut:
     alert = await db.get(SOSAlert, alert_id)
@@ -424,7 +425,7 @@ async def get_sos_stats(
 @router.get("/{alert_id}/status", response_model=SOSStatusResponse)
 async def get_sos_status(
     alert_id: UUID,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> SOSStatusResponse:
     alert = await db.get(SOSAlert, alert_id)
@@ -688,6 +689,7 @@ async def acknowledge_sos(
         created_at=now,
     )
     db.add(event)
+    record_audit_log(db, current_user, "sos_acknowledged", "sos_alert", str(alert.id), {"note": payload.note})
     _add_user_notification(
         db,
         alert,
@@ -731,6 +733,7 @@ async def verify_sos(
         created_at=now,
     )
     db.add(event)
+    record_audit_log(db, current_user, "sos_verified", "sos_alert", str(alert.id), {"note": payload.note})
     _add_user_notification(
         db,
         alert,
@@ -775,6 +778,7 @@ async def close_sos(
         created_at=now,
     )
     db.add(event)
+    record_audit_log(db, current_user, "sos_closed", "sos_alert", str(alert.id), {"note": payload.note})
     _add_user_notification(
         db,
         alert,
@@ -819,6 +823,7 @@ async def false_alarm_sos(
         created_at=now,
     )
     db.add(event)
+    record_audit_log(db, current_user, "sos_false_alarm", "sos_alert", str(alert.id), {"note": payload.note})
     _add_user_notification(
         db,
         alert,

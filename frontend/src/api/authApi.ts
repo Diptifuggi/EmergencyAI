@@ -16,7 +16,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
 export async function logout(): Promise<void> {
   try {
-    await axiosClient.post('/auth/logout')
+    await axiosClient.post('/auth/logout', { refresh_token: tokenStore.refreshToken })
   } catch (e) {
     // best-effort
   } finally {

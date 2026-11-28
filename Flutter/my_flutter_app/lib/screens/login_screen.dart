@@ -47,11 +47,54 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
+        final accessToken = data['access_token'] as String;
+        final refreshToken = data['refresh_token'] as String;
+
+        // Verify user role: block Operator/Supervisor/Admin from citizen mobile app
+        final meRes = await http.get(
+          Uri.parse('$baseUrl/api/v1/auth/me'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $accessToken',
+          },
+        ).timeout(const Duration(seconds: 10));
+
+        if (meRes.statusCode == 200) {
+          final me = jsonDecode(meRes.body) as Map<String, dynamic>;
+          final role = (me['role_name'] ?? '').toString().toLowerCase();
+          if (role != 'user') {
+            setState(() {
+              _errorMessage =
+                  'This app is for citizens only. Please sign in on the Operator Dashboard.';
+            });
+            return;
+          }
+        }
+
         await AuthStorageService.saveTokens(
-          accessToken: data['access_token'],
-          refreshToken: data['refresh_token'],
+          accessToken: accessToken,
+          refreshToken: refreshToken,
         );
+
+        // Cache citizen profile for Drawer & E-Contact suggestions
+        try {
+          final profRes = await http.get(
+            Uri.parse('$baseUrl/api/v1/users/me/profile'),
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $accessToken',
+            },
+          ).timeout(const Duration(seconds: 10));
+          if (profRes.statusCode == 200) {
+            await AuthStorageService.saveUserProfile(
+              jsonDecode(profRes.body) as Map<String, dynamic>,
+            );
+          }
+        } catch (_) {}
+
         if (mounted) Navigator.of(context).pop(true);
+      } else if (res.statusCode == 429) {
+        setState(() => _errorMessage = 'Too many failed login attempts. Please try again later.');
       } else {
         setState(() => _errorMessage = 'Invalid email or password.');
       }

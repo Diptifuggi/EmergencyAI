@@ -10,7 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
+from ...core.dependencies import get_current_operator
 from ...models.emergency_call import EmergencyCall
+from ...schemas.v1 import UserOut
 
 router = APIRouter()
 
@@ -68,7 +70,10 @@ def _get_category(call: EmergencyCall, analysis: dict[str, Any]) -> str:
 
 
 @router.get("/summary")
-async def summary(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+async def summary(
+    current_user: UserOut = Depends(get_current_operator),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
     result = await db.execute(select(EmergencyCall).order_by(EmergencyCall.created_at.desc()))
     records = result.scalars().all()
 

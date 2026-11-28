@@ -31,7 +31,8 @@ const ADMIN_ITEMS = [
 
 export default function Sidebar() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
+  const isAdmin = (user?.role_name || '').toLowerCase() === 'admin'
 
   const { data: healthy, isLoading } = useQuery({
     queryKey: ['system','health'],
@@ -39,6 +40,7 @@ export default function Sidebar() {
       const res = await axiosClient.get('/health')
       return res.status === 200
     },
+    enabled: isAuthenticated,
     refetchInterval: 30000,
     retry: false,
     initialData: false
@@ -47,6 +49,7 @@ export default function Sidebar() {
   const { data: sosStats } = useQuery({
     queryKey: ['sos', 'stats'],
     queryFn: getSosStats,
+    enabled: isAuthenticated,
     refetchInterval: 5000,
     retry: false,
   })
@@ -117,17 +120,19 @@ export default function Sidebar() {
           )
         })}
 
-        <div className="my-3 border-t border-[#232323]" />
-
-
-        {ADMIN_ITEMS.map(item => (
-          <NavLink key={item.to} to={item.to} className={({isActive}) =>
-            `flex items-center h-11 px-4 my-2 rounded-xl gap-3 transition-colors duration-200 ${isActive ? 'bg-[#1E1E1E] text-white border-l-2 border-white pl-3' : 'text-white/80 hover:bg-[#202020]'}`
-          }>
-            <item.Icon className="w-5 h-5 shrink-0" title={item.label} />
-            {!collapsed && <span className="min-w-0 truncate text-sm">{item.label}</span>}
-          </NavLink>
-        ))}
+        {isAdmin && (
+          <>
+            <div className="my-3 border-t border-[#232323]" />
+            {ADMIN_ITEMS.map(item => (
+              <NavLink key={item.to} to={item.to} className={({isActive}) =>
+                `flex items-center h-11 px-4 my-2 rounded-xl gap-3 transition-colors duration-200 ${isActive ? 'bg-[#1E1E1E] text-white border-l-2 border-white pl-3' : 'text-white/80 hover:bg-[#202020]'}`
+              }>
+                <item.Icon className="w-5 h-5 shrink-0" title={item.label} />
+                {!collapsed && <span className="min-w-0 truncate text-sm">{item.label}</span>}
+              </NavLink>
+            ))}
+          </>
+        )}
       </nav>
 
       <div className="px-3 py-4 border-t border-[#232323] flex items-center gap-3">

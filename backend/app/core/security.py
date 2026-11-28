@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import re
+import uuid
 from datetime import datetime, timedelta, UTC
 from typing import Any, Dict
 
@@ -8,6 +11,23 @@ from passlib.context import CryptContext
 
 from .config import settings
 from .exceptions import InvalidTokenError
+
+
+def validate_password_policy(password: str) -> None:
+    """Enforce password policy: min 8 chars, at least 1 uppercase, 1 lowercase, 1 digit."""
+    if not password or len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long.")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter.")
+    if not re.search(r"[a-z]", password):
+        raise ValueError("Password must contain at least one lowercase letter.")
+    if not re.search(r"\d", password):
+        raise ValueError("Password must contain at least one digit.")
+
+
+def hash_token(raw_token: str) -> str:
+    """One-way SHA-256 hash for storing refresh tokens safely in DB."""
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 pwd_context = CryptContext(
@@ -95,7 +115,8 @@ def create_refresh_token(
     payload = data.copy()
 
     payload.update({
-        "type": "refresh"
+        "type": "refresh",
+        "jti": uuid.uuid4().hex,
     })
 
     return _create_token(

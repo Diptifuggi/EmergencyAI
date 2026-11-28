@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
-from ...core.dependencies import get_current_user
+from ...core.dependencies import get_current_citizen
 from ...core.rate_limit import sos_rate_limiter
 from ...models.track_session import TrackPoint, TrackSession, TrackSessionStatus
 from ...models.user_notification import UserNotification
@@ -30,7 +30,7 @@ router = APIRouter()
 @router.post("/start", response_model=TrackSessionOut, status_code=status.HTTP_201_CREATED)
 async def start_track_session(
     payload: TrackStartRequest,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> TrackSessionOut:
     sos_rate_limiter.check_rate_limit(f"track_start_{current_user.id}", max_requests=10, window_seconds=60.0)
@@ -85,7 +85,7 @@ async def start_track_session(
 async def add_track_point(
     session_id: UUID,
     payload: TrackPointCreate,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> TrackPointOut:
     sos_rate_limiter.check_min_interval(f"track_pt_{session_id}", min_interval_seconds=5.0)
@@ -129,7 +129,7 @@ async def add_track_point(
 @router.post("/{session_id}/stop", response_model=TrackSessionOut)
 async def stop_track_session(
     session_id: UUID,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> TrackSessionOut:
     session = await db.get(TrackSession, session_id)
@@ -165,7 +165,7 @@ async def stop_track_session(
 @router.get("/{session_id}", response_model=TrackSessionOut)
 async def get_track_session(
     session_id: UUID,
-    current_user: UserOut = Depends(get_current_user),
+    current_user: UserOut = Depends(get_current_citizen),
     db: AsyncSession = Depends(get_db),
 ) -> TrackSessionOut:
     session = await db.get(TrackSession, session_id)

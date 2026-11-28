@@ -38687,3 +38687,619 @@ app.core.exceptions.OllamaUnavailableError: offline
 2026-11-26 21:37:48 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=400 elapsed_ms=4.0
 2026-11-26 21:37:48 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
 2026-11-26 21:37:48 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=13.9
+2026-11-27 08:13:29 | INFO | app.main | Database connection verified
+2026-11-27 08:13:29 | INFO | app.main | Startup complete in 0.45 seconds
+2026-11-27 08:13:29 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-11-27 08:13:29 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-11-27 08:14:19 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-27 08:14:19 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=74.5
+2026-11-27 08:14:19 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-27 08:14:19 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=5.0
+2026-11-27 08:34:53 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-27 08:34:58 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=200 elapsed_ms=4989.2
+2026-11-27 08:34:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/auth/me
+2026-11-27 08:34:58 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/auth/me status=404 elapsed_ms=24.6
+2026-11-27 08:34:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:34:59 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:34:59 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=943.3
+2026-11-27 08:35:02 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=3091.2
+2026-11-27 08:35:02 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:02 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=536.4
+2026-11-27 08:35:02 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:03 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=994.1
+2026-11-27 08:35:03 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:04 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=633.1
+2026-11-27 08:35:04 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:05 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=647.6
+2026-11-27 08:35:05 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:05 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=653.2
+2026-11-27 08:35:05 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:06 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=901.4
+2026-11-27 08:35:06 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:06 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:35:07 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=834.6
+2026-11-27 08:35:07 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=726.3
+2026-11-27 08:35:07 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:08 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=827.2
+2026-11-27 08:35:08 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:08 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=514.2
+2026-11-27 08:35:09 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:09 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=481.9
+2026-11-27 08:35:09 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:09 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=452.8
+2026-11-27 08:35:12 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:12 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:35:13 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1788.9
+2026-11-27 08:35:14 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=1029.6
+2026-11-27 08:35:19 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:35:19 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=553.2
+2026-11-27 08:35:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:25 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:35:25 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1709.6
+2026-11-27 08:35:25 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:27 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=1355.1
+2026-11-27 08:35:27 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1577.0
+2026-11-27 08:35:27 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1077.7
+2026-11-27 08:35:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:29 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 08:35:29 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=15.9
+2026-11-27 08:35:29 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1020.3
+2026-11-27 08:35:29 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:30 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=881.0
+2026-11-27 08:35:30 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:31 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1146.7
+2026-11-27 08:35:31 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:32 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:35:33 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1371.1
+2026-11-27 08:35:33 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:33 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=822.1
+2026-11-27 08:35:34 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=918.8
+2026-11-27 08:35:34 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:35 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1163.8
+2026-11-27 08:35:35 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:35 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:36 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1291.2
+2026-11-27 08:35:36 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:37 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1698.4
+2026-11-27 08:35:37 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1145.6
+2026-11-27 08:35:37 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 08:35:38 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 08:35:38 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=767.6
+2026-11-27 08:35:39 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=629.2
+2026-11-27 08:49:23 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 08:49:23 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=100.3
+2026-11-27 08:49:44 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 08:49:44 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=5.0
+2026-11-27 08:49:45 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 08:49:45 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=3.6
+2026-11-27 08:50:09 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:09 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=423.5
+2026-11-27 08:50:11 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:11 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=4.0
+2026-11-27 08:50:15 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/cancel
+2026-11-27 08:50:15 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/cancel status=401 elapsed_ms=16.0
+2026-11-27 08:50:16 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:16 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=10.4
+2026-11-27 08:50:18 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/cancel
+2026-11-27 08:50:18 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/cancel status=401 elapsed_ms=29.5
+2026-11-27 08:50:24 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:24 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=5.0
+2026-11-27 08:50:25 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/cancel
+2026-11-27 08:50:25 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/cancel status=401 elapsed_ms=12.7
+2026-11-27 08:50:29 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:29 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=5.5
+2026-11-27 08:50:31 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:31 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=3.6
+2026-11-27 08:50:35 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:36 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=437.3
+2026-11-27 08:50:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=3.3
+2026-11-27 08:50:44 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:50:44 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=5.1
+2026-11-27 08:51:00 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:51:00 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=4.0
+2026-11-27 08:51:11 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/stt/transcribe
+2026-11-27 08:51:12 | INFO | app.api.v1.stt | [STT] Request received content_type=audio/mp4 language_code=en-IN
+2026-11-27 08:51:12 | INFO | app.api.v1.stt | [STT] Upload received content_type=audio/mp4 file_size=6575 language_code=en-IN
+2026-11-27 08:51:12 | INFO | app.api.v1.stt | [STT] Normalizing incoming language=en-in before Sarvam call
+2026-11-27 08:51:12 | INFO | app.api.v1.stt | [STT] Calling Sarvam api_key_loaded=True model=saaras:v4 incoming_language=en-in
+2026-11-27 08:51:12 | INFO | app.services.sarvam_stt | [STT] Sarvam request start url=https://api.sarvam.ai/speech-to-text language_code=en-IN model=saaras:v4 mode=transcribe bytes=6575 content_type=audio/mp4
+2026-11-27 08:51:13 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:51:13 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=3.8
+2026-11-27 08:51:18 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/emergency-calls/text
+2026-11-27 08:51:19 | INFO | app.api.v1.emergency_calls | Emergency database persistence complete emergency_id=e21c224b-97d8-4697-b204-f1519a1986cf elapsed_ms=358.9
+2026-11-27 08:51:19 | INFO | app.api.v1.emergency_calls | Emergency request persisted emergency_id=e21c224b-97d8-4697-b204-f1519a1986cf elapsed_ms=691.2 analysis_scheduled=True
+2026-11-27 08:51:19 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/emergency-calls/text status=201 elapsed_ms=761.9
+2026-11-27 08:51:19 | INFO | app.services.emergency_call_analysis_runner | Emergency analysis status=analyzing emergency_id=e21c224b-97d8-4697-b204-f1519a1986cf
+2026-11-27 08:51:19 | INFO | app.services.emergency_analysis_service | Emergency analysis start language=en call_type=text text_length=10
+2026-11-27 08:51:19 | INFO | app.services.ollama_client | Ollama model request start base_url=http://localhost:11434 model=qwen2.5:0.5b timeout=120s
+2026-11-27 08:51:21 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 08:51:22 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=355.1
+2026-11-27 08:51:25 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 08:51:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=3386.2
+2026-11-27 08:51:32 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 08:51:32 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:51:32 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=6.8
+2026-11-27 08:51:33 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=289.2
+2026-11-27 08:51:35 | WARNING | app.services.sarvam_stt | [STT] Sarvam request failed error_type=ReadError elapsed_ms=22430.9
+2026-11-27 08:51:35 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/stt/transcribe status=503 elapsed_ms=24051.9
+2026-11-27 08:51:38 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 08:51:38 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=208.5
+2026-11-27 08:51:41 | INFO | app.services.ollama_client | Ollama model response received http_status=200 content_length=1091 elapsed_ms=22061.7
+2026-11-27 08:51:41 | INFO | app.services.emergency_analysis_service | Emergency analysis model response received content_length=1091
+2026-11-27 08:51:42 | INFO | app.services.emergency_analysis_service | Emergency analysis JSON parsed and raw schema validated keys=assault,burgling,child_involved,confidence,crime_in_progress,dispatch_recommendation,domestic_violence,elderly_involved,emergency_keywords,emergency_type,explosion_present,fire_present,help_required,highway_incident,home_intrusion,immediate_threat,injuries_present,medical_emergency,panic_level,panic_score,people_at_risk,police_required,priority_level,priority_score,railway_incident,rescue_required,road_accident,robbery,severe_bleeding,severity,stress_level,stress_score,trapped_persons,unconscious_person,victim_count,weapon_present,weapon_type
+2026-11-27 08:51:42 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Incident type detected: medical
+2026-11-27 08:51:42 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Priority calculated: MEDIUM
+2026-11-27 08:51:42 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Police required: False
+2026-11-27 08:51:42 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Recommended units: none
+2026-11-27 08:51:42 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Emergency numbers: none
+2026-11-27 08:51:42 | INFO | app.services.emergency_call_analysis_runner | Emergency analysis completed emergency_id=e21c224b-97d8-4697-b204-f1519a1986cf success=True failure_code=None
+2026-11-27 08:51:42 | INFO | app.services.emergency_call_analysis_runner | Emergency analysis database update complete emergency_id=e21c224b-97d8-4697-b204-f1519a1986cf status=analyzed
+2026-11-27 08:51:42 | INFO | app.services.emergency_call_analysis_runner | Background emergency analysis finished emergency_id=e21c224b-97d8-4697-b204-f1519a1986cf elapsed_ms=23194.2
+2026-11-27 08:51:43 | WARNING | app.services.location_service | Reverse geocoding unavailable status_code=404
+2026-11-27 08:51:44 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 08:51:45 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=104.7
+2026-11-27 08:52:27 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:52:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=49.2
+2026-11-27 08:52:33 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:52:33 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=2.5
+2026-11-27 08:53:29 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:53:29 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=3.1
+2026-11-27 08:53:34 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:53:34 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=8.4
+2026-11-27 08:54:29 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:54:29 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=5.3
+2026-11-27 08:54:34 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:54:34 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=21.0
+2026-11-27 08:55:30 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:55:30 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=12.4
+2026-11-27 08:55:34 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 08:55:34 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=401 elapsed_ms=4.3
+2026-11-27 09:01:52 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:01:52 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=8.8
+2026-11-27 09:01:52 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:01:52 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:52 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=847.3
+2026-11-27 09:01:52 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=413.7
+2026-11-27 09:01:53 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:53 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=480.8
+2026-11-27 09:01:55 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:01:55 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:56 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=159.9
+2026-11-27 09:01:56 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=243.7
+2026-11-27 09:01:56 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:57 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=665.7
+2026-11-27 09:01:57 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:57 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=556.0
+2026-11-27 09:01:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:01:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:58 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=161.7
+2026-11-27 09:01:58 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=243.5
+2026-11-27 09:01:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:58 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=236.4
+2026-11-27 09:01:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:58 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=219.4
+2026-11-27 09:01:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:59 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=182.9
+2026-11-27 09:01:59 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:59 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=172.4
+2026-11-27 09:01:59 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:01:59 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=146.8
+2026-11-27 09:02:38 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:02:38 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=2.0
+2026-11-27 09:02:38 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:02:38 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=137.1
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/profile
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/profile status=200 elapsed_ms=13.0
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=PUT endpoint=/api/v1/users/me/profile
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=PUT endpoint=/api/v1/users/me/profile status=422 elapsed_ms=3.7
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=PUT endpoint=/api/v1/users/me/profile
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=PUT endpoint=/api/v1/users/me/profile status=200 elapsed_ms=8.8
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=11.3
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=11.2
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=200 elapsed_ms=3.9
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=200 elapsed_ms=16.7
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/cancel
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/cancel status=200 elapsed_ms=9.9
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/location
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/location status=200 elapsed_ms=6.3
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=403 elapsed_ms=5.2
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/stats status=403 elapsed_ms=5.2
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=403 elapsed_ms=4.6
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/{id}
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/{id} status=200 elapsed_ms=11.2
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=200 elapsed_ms=6.1
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=400 elapsed_ms=6.0
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/verify
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/verify status=200 elapsed_ms=5.0
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/close
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=200 elapsed_ms=6.5
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/close
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=400 elapsed_ms=4.5
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=23.1
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-27 09:04:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=11.7
+2026-11-27 09:04:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/users/me/emergency-contacts
+2026-11-27 09:04:43 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/users/me/emergency-contacts status=422 elapsed_ms=5.2
+2026-11-27 09:04:43 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/users/me/emergency-contacts
+2026-11-27 09:04:43 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/users/me/emergency-contacts status=400 elapsed_ms=3.1
+2026-11-27 09:04:43 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-27 09:04:43 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=200 elapsed_ms=9.1
+2026-11-27 09:04:43 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/public/track/tok_secret_abc
+2026-11-27 09:04:43 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/public/track/tok_secret_abc status=200 elapsed_ms=7.6
+2026-11-27 09:04:43 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-27 09:04:43 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=401 elapsed_ms=7.6
+2026-11-27 09:04:43 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/location/reverse
+2026-11-27 09:04:43 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/location/reverse status=200 elapsed_ms=5.2
+2026-11-27 09:07:02 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:02 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:07:02 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:07:02 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=7.5
+2026-11-27 09:07:02 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/stats status=401 elapsed_ms=51.4
+2026-11-27 09:07:02 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-27 09:07:02 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=32.3
+2026-11-27 09:07:02 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=730.4
+2026-11-27 09:07:02 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:03 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=461.9
+2026-11-27 09:07:03 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:06 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=2969.5
+2026-11-27 09:07:15 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-27 09:07:18 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=200 elapsed_ms=2862.3
+2026-11-27 09:07:18 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/auth/me
+2026-11-27 09:07:18 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/auth/me status=404 elapsed_ms=5.0
+2026-11-27 09:07:18 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:07:18 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:19 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=763.0
+2026-11-27 09:07:19 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=1040.5
+2026-11-27 09:07:20 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:20 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=394.7
+2026-11-27 09:07:20 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:20 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=462.5
+2026-11-27 09:07:20 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:21 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=428.0
+2026-11-27 09:07:21 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:21 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=405.4
+2026-11-27 09:07:21 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:22 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=468.9
+2026-11-27 09:07:22 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:22 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=448.6
+2026-11-27 09:07:22 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:23 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=425.0
+2026-11-27 09:07:23 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:23 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=374.4
+2026-11-27 09:07:23 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:23 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=285.7
+2026-11-27 09:07:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=305.6
+2026-11-27 09:07:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=225.8
+2026-11-27 09:07:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:07:25 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=423.6
+2026-11-27 09:07:30 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-27 09:07:30 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:07:31 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=732.5
+2026-11-27 09:07:31 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=200 elapsed_ms=848.3
+2026-11-27 09:07:36 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-27 09:07:36 | ERROR | app.main | HTTP request failed method=GET endpoint=/api/v1/sos/stats error_type=ProgrammingError elapsed_ms=261.4
+2026-11-27 09:08:44 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:08:44 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=40.6
+2026-11-27 09:08:50 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:08:50 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=2.1
+2026-11-27 09:09:09 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:09:09 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=12.3
+2026-11-27 09:09:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:09:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=4.3
+2026-11-27 09:09:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:09:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=2.1
+2026-11-27 09:09:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 09:09:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=5.2
+2026-11-27 09:09:39 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:09:39 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.7
+2026-11-27 09:09:54 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:09:54 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=7.4
+2026-11-27 09:10:09 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:10:09 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=7.2
+2026-11-27 09:10:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:10:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=6.4
+2026-11-27 09:10:39 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:10:39 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.6
+2026-11-27 09:10:54 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:10:54 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.6
+2026-11-27 09:11:09 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:11:09 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.6
+2026-11-27 09:11:20 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/mine
+2026-11-27 09:11:20 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/mine status=401 elapsed_ms=26.0
+2026-11-27 09:11:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:11:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.6
+2026-11-27 09:11:39 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:11:39 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=5.1
+2026-11-27 09:11:43 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/track/start
+2026-11-27 09:11:43 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/track/start status=401 elapsed_ms=4.5
+2026-11-27 09:11:54 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:11:54 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.7
+2026-11-27 09:12:01 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/location/reverse
+2026-11-27 09:12:01 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/location/reverse status=401 elapsed_ms=4.7
+2026-11-27 09:12:10 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:12:10 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.2
+2026-11-27 09:12:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:12:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.4
+2026-11-27 09:12:26 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/location/reverse
+2026-11-27 09:12:26 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/location/reverse status=401 elapsed_ms=2.8
+2026-11-27 09:12:39 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 09:12:39 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.0
+2026-11-27 09:54:14 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-27 09:54:14 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=47.3
+2026-11-27 09:54:16 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-27 09:54:16 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=5.4
+2026-11-27 12:26:01 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 12:26:01 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=41.4
+2026-11-27 12:26:13 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:26:13 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 12:26:13 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=5.4
+2026-11-27 12:26:13 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=65.1
+2026-11-27 12:26:17 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 12:26:17 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=2.5
+2026-11-27 12:26:17 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-27 12:26:17 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=1.7
+2026-11-27 12:26:19 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:26:19 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.8
+2026-11-27 12:26:34 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:26:34 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.7
+2026-11-27 12:26:50 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:26:50 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=5.1
+2026-11-27 12:27:03 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/emergency-calls/text
+2026-11-27 12:27:04 | INFO | app.api.v1.emergency_calls | Emergency database persistence complete emergency_id=39305d89-11bd-49a4-aad4-3c3f89485ddf elapsed_ms=904.1
+2026-11-27 12:27:04 | INFO | app.api.v1.emergency_calls | Emergency request persisted emergency_id=39305d89-11bd-49a4-aad4-3c3f89485ddf elapsed_ms=1316.5 analysis_scheduled=True
+2026-11-27 12:27:04 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/emergency-calls/text status=201 elapsed_ms=1374.5
+2026-11-27 12:27:04 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:27:04 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.5
+2026-11-27 12:27:04 | INFO | app.services.emergency_call_analysis_runner | Emergency analysis status=analyzing emergency_id=39305d89-11bd-49a4-aad4-3c3f89485ddf
+2026-11-27 12:27:04 | INFO | app.services.emergency_analysis_service | Emergency analysis start language=en call_type=text text_length=9
+2026-11-27 12:27:04 | INFO | app.services.ollama_client | Ollama model request start base_url=http://localhost:11434 model=qwen2.5:0.5b timeout=120s
+2026-11-27 12:27:06 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 12:27:07 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=450.7
+2026-11-27 12:27:10 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 12:27:14 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=4508.6
+2026-11-27 12:27:18 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 12:27:19 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=259.3
+2026-11-27 12:27:19 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:27:19 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.9
+2026-11-27 12:27:24 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 12:27:24 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=239.4
+2026-11-27 12:27:27 | INFO | app.services.ollama_client | Ollama model response received http_status=200 content_length=1128 elapsed_ms=22646.1
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | Emergency analysis model response received content_length=1128
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | Emergency analysis JSON parsed and raw schema validated keys=assault_in_progress,burgary_in_progress,child_involved,confidence,crime_in_progress,dispatch_recommendation,domestic_violence,elderly_involved,emergency_keywords,emergency_type,explosion_present,fire_present,help_required,highway_incident,home_intrusion,immediate_threat,injuries_present,medical_emergency,panic_level,panic_score,people_at_risk,police_required,priority_level,priority_score,railway_incident,rescue_required,road_accident,robbery_in_progress,severe_bleeding,severity,stress_level,stress_score,trapped_persons,unconscious_person,victim_count,weapon_present,weapon_type
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Incident type detected: unknown
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Priority calculated: LOW
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Police required: False
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Recommended units: none
+2026-11-27 12:27:27 | INFO | app.services.emergency_analysis_service | [EmergencyIQ] Emergency numbers: none
+2026-11-27 12:27:27 | INFO | app.services.emergency_call_analysis_runner | Emergency analysis completed emergency_id=39305d89-11bd-49a4-aad4-3c3f89485ddf success=True failure_code=None
+2026-11-27 12:27:27 | INFO | app.services.emergency_call_analysis_runner | Emergency analysis database update complete emergency_id=39305d89-11bd-49a4-aad4-3c3f89485ddf status=analyzed
+2026-11-27 12:27:27 | INFO | app.services.emergency_call_analysis_runner | Background emergency analysis finished emergency_id=39305d89-11bd-49a4-aad4-3c3f89485ddf elapsed_ms=23258.2
+2026-11-27 12:27:28 | WARNING | app.services.location_service | Reverse geocoding unavailable status_code=404
+2026-11-27 12:27:34 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-27 12:27:34 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=3.7
+2026-11-27 12:27:35 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/{id}
+2026-11-27 12:27:35 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/{id} status=200 elapsed_ms=226.5
+2026-11-27 12:29:04 | INFO | app.main | Shutting down gracefully
+2026-11-28 09:00:04 | INFO | app.main | Database connection verified
+2026-11-28 09:00:04 | INFO | app.main | Startup complete in 0.40 seconds
+2026-11-28 09:00:04 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-11-28 09:00:04 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-11-28 09:00:04 | INFO | app.main | Shutting down gracefully
+2026-11-28 09:00:19 | INFO | app.main | Database connection verified
+2026-11-28 09:00:19 | INFO | app.main | Startup complete in 0.35 seconds
+2026-11-28 09:00:19 | INFO | app.main | Audio detector backend: lightweight_fallback
+2026-11-28 09:00:19 | INFO | app.main | Ollama model: qwen2.5:0.5b
+2026-11-28 09:01:07 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:01:07 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=73.9
+2026-11-28 09:01:07 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:01:07 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=8.4
+2026-11-28 09:02:46 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-28 09:02:46 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=3.0
+2026-11-28 09:02:53 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-28 09:02:53 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=1.8
+2026-11-28 09:02:53 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-28 09:02:54 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=4.7
+2026-11-28 09:02:58 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/location/reverse
+2026-11-28 09:02:58 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/location/reverse status=401 elapsed_ms=3.0
+2026-11-28 09:03:03 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:03:03 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=616.5
+2026-11-28 09:03:04 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-28 09:03:04 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.3
+2026-11-28 09:03:07 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:03:07 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=274.2
+2026-11-28 09:03:19 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-28 09:03:19 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.4
+2026-11-28 09:03:22 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-28 09:03:22 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=1.9
+2026-11-28 09:03:29 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-28 09:03:29 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=1.6
+2026-11-28 09:03:30 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/health
+2026-11-28 09:03:30 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/health status=200 elapsed_ms=1.7
+2026-11-28 09:03:34 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/notifications/unread-count
+2026-11-28 09:03:34 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/notifications/unread-count status=401 elapsed_ms=2.4
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/profile
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/profile status=200 elapsed_ms=13.8
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=PUT endpoint=/api/v1/users/me/profile
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=PUT endpoint=/api/v1/users/me/profile status=422 elapsed_ms=3.5
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=PUT endpoint=/api/v1/users/me/profile
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=PUT endpoint=/api/v1/users/me/profile status=200 elapsed_ms=6.7
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=9.4
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=10.9
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=200 elapsed_ms=5.3
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=200 elapsed_ms=13.2
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/cancel
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/cancel status=200 elapsed_ms=7.2
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/location
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/location status=200 elapsed_ms=7.2
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=403 elapsed_ms=5.8
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/stats status=403 elapsed_ms=4.5
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=403 elapsed_ms=3.1
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/{id}
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/{id} status=200 elapsed_ms=7.9
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=200 elapsed_ms=3.9
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=400 elapsed_ms=3.2
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/verify
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/verify status=200 elapsed_ms=3.5
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/close
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=200 elapsed_ms=4.8
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/close
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=400 elapsed_ms=3.3
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=19.8
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=8.3
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/users/me/emergency-contacts
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/users/me/emergency-contacts status=422 elapsed_ms=4.7
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/users/me/emergency-contacts
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/users/me/emergency-contacts status=400 elapsed_ms=5.0
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=200 elapsed_ms=5.9
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/public/track/tok_secret_abc
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/public/track/tok_secret_abc status=200 elapsed_ms=7.8
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=401 elapsed_ms=5.3
+2026-11-28 09:16:28 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/location/reverse
+2026-11-28 09:16:28 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/location/reverse status=200 elapsed_ms=2.9
+2026-11-28 09:18:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:18:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=23.6
+2026-11-28 09:18:28 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:18:28 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=7.1
+2026-11-28 09:18:33 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:18:33 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=3.4
+2026-11-28 09:18:33 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:18:33 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=422 elapsed_ms=15.4
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/profile
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/profile status=200 elapsed_ms=63.4
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=PUT endpoint=/api/v1/users/me/profile
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=PUT endpoint=/api/v1/users/me/profile status=422 elapsed_ms=6.1
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=PUT endpoint=/api/v1/users/me/profile
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=PUT endpoint=/api/v1/users/me/profile status=200 elapsed_ms=8.2
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=10.5
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=9.9
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=200 elapsed_ms=4.6
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=200 elapsed_ms=12.4
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/cancel
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/cancel status=200 elapsed_ms=6.8
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/location
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/location status=200 elapsed_ms=11.0
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=403 elapsed_ms=5.1
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/stats
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/stats status=403 elapsed_ms=3.0
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=403 elapsed_ms=3.8
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/{id}
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/{id} status=200 elapsed_ms=9.2
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=200 elapsed_ms=4.5
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=400 elapsed_ms=4.6
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/verify
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/verify status=200 elapsed_ms=3.4
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/close
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=200 elapsed_ms=4.5
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/close
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/close status=400 elapsed_ms=4.1
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=17.2
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos status=201 elapsed_ms=10.0
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/users/me/emergency-contacts
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/users/me/emergency-contacts status=422 elapsed_ms=7.3
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/users/me/emergency-contacts
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/users/me/emergency-contacts status=400 elapsed_ms=5.3
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/sos/{id}/ack
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/sos/{id}/ack status=200 elapsed_ms=4.7
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/public/track/tok_secret_abc
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/public/track/tok_secret_abc status=200 elapsed_ms=4.2
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=401 elapsed_ms=3.9
+2026-11-28 09:22:40 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/location/reverse
+2026-11-28 09:22:40 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/location/reverse status=200 elapsed_ms=2.8
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=401 elapsed_ms=3.0
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/profile
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/profile status=401 elapsed_ms=3.8
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/ status=401 elapsed_ms=5.3
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/audit/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/audit/ status=401 elapsed_ms=2.8
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos status=403 elapsed_ms=3.3
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/emergency-calls/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/emergency-calls/ status=403 elapsed_ms=3.4
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/analytics/summary
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/analytics/summary status=403 elapsed_ms=3.7
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/dashboard/summary
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/dashboard/summary status=403 elapsed_ms=3.5
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/ status=403 elapsed_ms=4.3
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/audit/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/audit/ status=403 elapsed_ms=3.6
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/profile
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/profile status=403 elapsed_ms=4.8
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/me/emergency-contacts
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/me/emergency-contacts status=403 elapsed_ms=3.2
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/sos/mine
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/sos/mine status=403 elapsed_ms=5.0
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/ status=403 elapsed_ms=3.3
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/audit/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/audit/ status=403 elapsed_ms=5.4
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/roles/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/roles/ status=403 elapsed_ms=4.0
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/users/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/users/ status=200 elapsed_ms=3.1
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/audit/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/audit/ status=200 elapsed_ms=7.2
+2026-11-28 09:22:41 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/roles/
+2026-11-28 09:22:41 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/roles/ status=200 elapsed_ms=3.6
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=GET endpoint=/api/v1/auth/me
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=GET endpoint=/api/v1/auth/me status=401 elapsed_ms=5.2
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=200 elapsed_ms=3.3
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/refresh
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/refresh status=401 elapsed_ms=1.3
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=3.7
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=1.6
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=1.7
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=1.7
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=401 elapsed_ms=1.7
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/login
+2026-11-28 09:22:42 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/login status=429 elapsed_ms=15.5
+2026-11-28 09:22:42 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/register
+2026-11-28 09:22:43 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/register status=422 elapsed_ms=4.0
+2026-11-28 09:22:43 | INFO | app.main | HTTP request start method=POST endpoint=/api/v1/auth/register
+2026-11-28 09:22:43 | INFO | app.main | HTTP response method=POST endpoint=/api/v1/auth/register status=201 elapsed_ms=8.2

@@ -26,6 +26,7 @@ import NewCallDialog from '@/components/calls/NewCallDialog'
 import SosAlertsPage from '@/pages/sos/SosAlertsPage'
 import SosDetailPage from '@/pages/sos/SosDetailPage'
 import PublicTrackPage from '@/pages/PublicTrackPage'
+import UnauthorizedPage from '@/pages/UnauthorizedPage'
 
 
 const queryClient = new QueryClient({
@@ -48,9 +49,10 @@ function AppRoutes(){
       <Route path="/register" element={<Register />} />
       <Route path="/signup" element={<Register />} />
       <Route path="/login" element={<LoginWrapper />} />
+      <Route path="/unauthorized" element={<UnauthorizedPage />} />
       <Route path="/track/:token" element={<PublicTrackPage />} />
 
-      <Route path="/" element={<ProtectedRoute><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
+      <Route path="/" element={<ProtectedRoute allowedRoles={['Operator', 'Supervisor', 'Admin']}><ErrorBoundary><Layout /></ErrorBoundary></ProtectedRoute>}>
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="sos" element={<SosAlertsPage />} />
@@ -66,9 +68,9 @@ function AppRoutes(){
         <Route path="sop" element={<SOPManager />} />
         <Route path="analytics" element={<Analytics />} />
 
-        <Route path="admin/users" element={<UsersAdmin />} />
-        <Route path="admin/roles" element={<RolesAdmin />} />
-        <Route path="admin/audit" element={<AuditLogs />} />
+        <Route path="admin/users" element={<ProtectedRoute allowedRoles={['Admin']}><UsersAdmin /></ProtectedRoute>} />
+        <Route path="admin/roles" element={<ProtectedRoute allowedRoles={['Admin']}><RolesAdmin /></ProtectedRoute>} />
+        <Route path="admin/audit" element={<ProtectedRoute allowedRoles={['Admin']}><AuditLogs /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

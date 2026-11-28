@@ -15,6 +15,7 @@ from .sos_alert import (
 from .emergency_contact import EmergencyContact
 from .user_notification import UserNotification
 from .track_session import TrackSession, TrackPoint, TrackSessionStatus
+from .auth_token import RefreshToken, AuditLog
 
 __all__ = [
     "EmergencyCall",
@@ -35,4 +36,6 @@ __all__ = [
     "TrackSession",
     "TrackPoint",
     "TrackSessionStatus",
+    "RefreshToken",
+    "AuditLog",
 ]

@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import BASE_DIR, settings
 from ...core.database import async_session, get_db
+from ...core.dependencies import get_current_operator, get_optional_user
 from ...core.exceptions import FileTooLargeError, InvalidFileTypeError
 from ...core.language import bcp47_language
 from ...core.logger import get_logger
@@ -42,6 +43,8 @@ from ...schemas.emergency_call import (
     EmergencyCallTextCreate,
     EmergencyCallUpdate,
 )
+from ...schemas.v1 import UserOut
+from .audit import record_audit_log
 from ...services.emergency_call_analysis_runner import (
     has_analyzable_transcript,
     run_post_create_analysis_in_background,
@@ -893,6 +896,7 @@ async def create_voice_and_text_emergency(
 
 @router.get("/", response_model=EmergencyCallListOut)
 async def list_emergency_calls(
+    current_user: UserOut = Depends(get_current_operator),
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -920,6 +924,7 @@ async def list_emergency_calls(
 @router.get("/{call_id}", response_model=EmergencyCallOut)
 async def get_emergency_call(
     call_id: uuid.UUID,
+    current_user: UserOut = Depends(get_current_operator),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     result = await db.get(EmergencyCall, call_id)
@@ -933,6 +938,7 @@ async def update_emergency_call(
     call_id: uuid.UUID,
     payload: EmergencyCallUpdate,
     background_tasks: BackgroundTasks,
+    current_user: UserOut = Depends(get_current_operator),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """Update transcription/status/metadata later without breaking clients."""

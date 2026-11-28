@@ -32,7 +32,7 @@ export default function Topbar(){
   const now = useClock()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, logout } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -43,6 +43,7 @@ export default function Topbar(){
   const { data: callRecords = [] } = useQuery({
     queryKey: ['emergency-calls'],
     queryFn: () => getEmergencies({ limit: 200, offset: 0 }),
+    enabled: isAuthenticated,
     refetchInterval: 10000,
     retry: false,
   })

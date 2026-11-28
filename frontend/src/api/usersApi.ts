@@ -22,9 +22,15 @@ export async function listRoles(): Promise<Role[]> {
   return resp.data
 }
 
+export async function resetUserPassword(id: string, newPassword: string): Promise<any> {
+  const resp = await axiosClient.post(`/users/${id}/reset-password`, { new_password: newPassword })
+  return resp.data
+}
+
 export default {
   listUsers,
   createUser,
   updateUser,
   listRoles,
+  resetUserPassword,
 }

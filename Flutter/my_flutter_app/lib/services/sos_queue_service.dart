@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/network/api_client.dart';
+import '../core/network/auth_http_client.dart';
 import 'auth_storage_service.dart';
 import 'settings_service.dart';
 import 'sos_location_service.dart';
@@ -190,10 +191,6 @@ class SosQueueService {
     _statusController.add(alert);
 
     try {
-      final baseUrl = await ApiClient.getBaseUrl();
-      final uri = Uri.parse('$baseUrl/api/v1/sos');
-      final token = await AuthStorageService.getAccessToken();
-
       final body = {
         'id': alert.id,
         'idempotency_key': alert.idempotencyKey,
@@ -208,15 +205,11 @@ class SosQueueService {
         'app_version': '1.0.0',
       };
 
-      final headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
-
-      final response = await http
-          .post(uri, headers: headers, body: jsonEncode(body))
-          .timeout(const Duration(seconds: 15));
+      final response = await AuthHttpClient.post(
+        '/api/v1/sos',
+        body: jsonEncode(body),
+        timeout: const Duration(seconds: 15),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;

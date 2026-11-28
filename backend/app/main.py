@@ -76,13 +76,14 @@ app.add_middleware(RequestTimingMiddleware)
 
 register_exception_handlers(app)
 
-# Flutter (native) ignores CORS; web/dev clients need open origins in development.
-_cors_origins = settings.ALLOWED_ORIGINS or ["*"]
-_allow_all = "*" in _cors_origins
+# Strict CORS allowlist from env (dashboard origin only; no wildcard)
+_cors_origins = [o for o in (settings.ALLOWED_ORIGINS or []) if o != "*"]
+if not _cors_origins:
+    _cors_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if _allow_all else _cors_origins,
-    allow_credentials=not _allow_all,
+    allow_origins=_cors_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

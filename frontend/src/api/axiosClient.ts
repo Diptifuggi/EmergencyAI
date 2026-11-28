@@ -88,6 +88,9 @@ axiosClient.interceptors.response.use(
         })
         const newToken = res.data.access_token
         tokenStore.setAccessToken(newToken)
+        if (res.data.refresh_token) {
+          tokenStore.setRefreshToken(res.data.refresh_token)
+        }
         failQueue.forEach(p => p.resolve(newToken))
         failQueue = []
         orig.headers.set('Authorization', `Bearer ${newToken}`)
@@ -96,6 +99,9 @@ axiosClient.interceptors.response.use(
         failQueue.forEach(p => p.reject(e))
         failQueue = []
         tokenStore.clearTokens()
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/track/')) {
+          window.location.href = '/login'
+        }
         return Promise.reject(e)
       } finally { isRefreshing = false }
     }
