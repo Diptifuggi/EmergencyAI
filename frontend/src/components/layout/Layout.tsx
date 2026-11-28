@@ -3,8 +3,10 @@ import React from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import { useOperatorWebSocket } from '@/hooks/useOperatorWebSocket'
 
 export default function Layout(){
+  useOperatorWebSocket()
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />

@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 import time
@@ -6,9 +6,13 @@ import re
 
 from .core.config import settings
 from .core.logger import get_logger
-from .core.database import engine
+from .core.database import async_session, engine
+from .core.dependencies import OPERATOR_ROLES
 from .core.exceptions import register_exception_handlers
+from .core.security import decode_token
+from .core.ws_manager import ws_manager
 from .api.v1 import router as api_v1
+from .services.auth_service import AuthService
 
 logger = get_logger("app.main")
 
@@ -89,6 +93,43 @@ app.add_middleware(
 )
 
 app.include_router(api_v1.api_router, prefix="/api/v1")
+
+
+@app.websocket("/ws/operator")
+async def operator_websocket(
+    websocket: WebSocket,
+    token: str | None = Query(default=None),
+):
+    raw_token = token
+    if not raw_token:
+        auth_header = websocket.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            raw_token = auth_header[7:].strip()
+
+    if not raw_token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        payload = decode_token(raw_token)
+        if not payload or payload.get("type") != "access":
+            await websocket.close(code=1008)
+            return
+        async with async_session() as db:
+            user = await AuthService.get_user_by_id(db, str(payload.get("sub")))
+            if not user or not user.is_active or (user.role_name or "").lower() not in OPERATOR_ROLES:
+                await websocket.close(code=1008)
+                return
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    await ws_manager.connect("operator", websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await ws_manager.disconnect("operator", websocket)
 
 
 @app.get("/")

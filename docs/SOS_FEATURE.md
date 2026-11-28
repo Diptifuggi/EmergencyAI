@@ -187,7 +187,26 @@ During user profile registration or editing within the Flutter application, user
 
 ### 7.4 Known Limits (Extended Phase)
 - **No SMS Gateway**: Emergency contacts are displayed to operators and TrackMe links are shared via `share_plus` or user-initiated `sms:` intents; no automated SMS gateway is integrated.
-- **No Two-Way Chat Yet**: The "Chat Us" shortcut focuses the existing typed emergency report field (`TODO` noted for two-way operator chat).
+- **No Two-Way Chat Yet**: The "Chat Us" shortcut displays a clear "coming soon" notice and focuses the existing typed emergency report field.
 - **No Official 112 Integration**: "Dial 112" opens the native phone dialer after confirmation and never auto-calls; server receipt is not confirmation of official dispatch.
 - **Push Notifications**: Uses 15-second polling while open; Firebase Cloud Messaging push is omitted because `firebase_messaging` is not configured in the repository.
+
+---
+
+## 8. Phases A–D Security, Real-Time WebSocket & End-to-End Architecture
+
+- **Authentication & RBAC (Phase A)**:
+  - Access tokens (30m) + rotating refresh tokens (7d, SHA-256 hashed in `refresh_tokens`).
+  - Logout and password change/admin reset revoke refresh tokens in PostgreSQL.
+  - Account + IP exponential lockout after 5 failed logins; CORS allowlist from `ALLOWED_ORIGINS` (no wildcard with credentials).
+  - Flutter stores tokens in `flutter_secure_storage` with a 401 refresh-and-retry interceptor (`AuthHttpClient`).
+  - Dashboard enforces role-based routes (`Operator`/`Supervisor`/`Admin`, Admin-only `/admin/*`), 30-minute inactivity auto-logout with 1-minute warning, and `/unauthorized` 403 handling.
+- **End-to-End Data Flow (Phase B)**:
+  - Voice/text emergency reports attach `user_id` from JWT and link to `UserDetailPage` (`/users/:id`).
+  - Dashboard KPI cards include `Active SOS`, `Silent SOS`, `Panic Button`, `Pending Verification`, and `TrackMe Active` (separate from `Total Calls`).
+  - All timestamps stored in UTC and formatted in **IST (`Asia/Kolkata`)** across Flutter and React.
+- **Real-Time TrackMe & Operator WebSocket (Phases C & D)**:
+  - `WS /ws/operator` (JWT-authenticated for operators/supervisors/admins) broadcasts `sos.created`, `sos.updated`, `sos.cancelled`, `track.updated`, and `report.created` in `<2s`, with exponential backoff reconnect and 5s polling fallback on the dashboard.
+  - TrackMe supports Android foreground location service, battery-aware 15-30s intervals, offline point buffering with `client_point_id` deduplication, SOS auto-attachment, and operator `LiveTrackingPage` (`/live-tracking`) with audit logging.
+
 

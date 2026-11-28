@@ -13,6 +13,7 @@ from ...core.database import get_db
 from ...core.dependencies import get_current_citizen, get_current_operator, get_current_user
 from ...core.encryption import decrypt_field, decrypt_json, encrypt_json
 from ...core.rate_limit import sos_rate_limiter
+from ...core.ws_manager import ws_manager
 from .audit import record_audit_log
 from ...models.emergency_contact import EmergencyContact
 from ...models.sos_alert import (
@@ -208,6 +209,18 @@ async def create_sos(
     await db.commit()
     await db.refresh(alert)
 
+    await ws_manager.broadcast(
+        "operator",
+        {
+            "event": "sos.created",
+            "alert_id": str(alert.id),
+            "alert_type": alert.alert_type,
+            "service_category": alert.service_category,
+            "status": alert.status,
+            "received_at": alert.received_at.isoformat() if alert.received_at else None,
+        },
+    )
+
     logger.info(f"SOS alert created id={alert.id} alert_type={alert.alert_type}")
     return SOSCreateResponse(
         id=alert.id,
@@ -290,6 +303,10 @@ async def cancel_sos(
     )
 
     await db.commit()
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "sos.cancelled", "alert_id": str(alert.id), "status": alert.status},
+    )
     return {"id": str(alert.id), "status": alert.status, "cancelled_at": alert.cancelled_at}
 
 
@@ -714,6 +731,10 @@ async def acknowledge_sos(
     )
 
     await db.commit()
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "sos.updated", "alert_id": str(alert.id), "status": alert.status},
+    )
     return {"id": str(alert.id), "status": alert.status, "acknowledged_at": alert.acknowledged_at}
 
 
@@ -758,6 +779,10 @@ async def verify_sos(
     )
 
     await db.commit()
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "sos.updated", "alert_id": str(alert.id), "status": alert.status},
+    )
     return {"id": str(alert.id), "status": alert.status, "verified_at": alert.verified_at}
 
 
@@ -803,6 +828,10 @@ async def close_sos(
     )
 
     await db.commit()
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "sos.updated", "alert_id": str(alert.id), "status": alert.status},
+    )
     return {"id": str(alert.id), "status": alert.status, "closed_at": alert.closed_at}
 
 
@@ -848,4 +877,8 @@ async def false_alarm_sos(
     )
 
     await db.commit()
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "sos.updated", "alert_id": str(alert.id), "status": alert.status},
+    )
     return {"id": str(alert.id), "status": alert.status, "closed_at": alert.closed_at}

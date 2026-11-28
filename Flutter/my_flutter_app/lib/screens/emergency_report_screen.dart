@@ -1304,7 +1304,14 @@ class _EmergencyReportScreenState extends State<EmergencyReportScreen> {
         label: l10n.shortcutChatUs,
         color: Colors.blue,
         onTap: () {
-          // TODO: Implement dedicated two-way operator chat screen
+          // Two-way operator chat is coming soon; focus the emergency text box for immediate reporting
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Two-way operator chat is coming soon. Use the emergency text box below for immediate reporting.',
+              ),
+            ),
+          );
           final ctx = _textBoxKey.currentContext;
           if (ctx != null) {
             Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 350));

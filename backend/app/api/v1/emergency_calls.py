@@ -35,6 +35,7 @@ from ...core.dependencies import get_current_citizen, get_current_operator, get_
 from ...core.exceptions import FileTooLargeError, InvalidFileTypeError
 from ...core.language import bcp47_language
 from ...core.logger import get_logger
+from ...core.ws_manager import ws_manager
 from ...models.emergency_call import EmergencyCall
 from ...schemas.emergency_call import (
     EmergencyCallListOut,
@@ -482,6 +483,10 @@ async def create_text_emergency(
 
     _schedule_emergency_analysis(background_tasks, emergency)
     _schedule_location_address(background_tasks, emergency)
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "report.created", "call_id": str(emergency.id), "call_type": emergency.call_type},
+    )
     logger.info(
         "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
         emergency.id,
@@ -762,6 +767,10 @@ async def create_audio_emergency(
 
     _schedule_emergency_analysis(background_tasks, emergency)
     _schedule_location_address(background_tasks, emergency)
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "report.created", "call_id": str(emergency.id), "call_type": emergency.call_type},
+    )
     logger.info(
         "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
         emergency.id,
@@ -891,6 +900,10 @@ async def create_voice_and_text_emergency(
 
     _schedule_emergency_analysis(background_tasks, emergency)
     _schedule_location_address(background_tasks, emergency)
+    await ws_manager.broadcast(
+        "operator",
+        {"event": "report.created", "call_id": str(emergency.id), "call_type": emergency.call_type},
+    )
     logger.info(
         "Emergency request persisted emergency_id=%s elapsed_ms=%.1f analysis_scheduled=%s",
         emergency.id,
