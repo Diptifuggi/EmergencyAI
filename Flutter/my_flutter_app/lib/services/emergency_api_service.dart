@@ -10,6 +10,7 @@ import '../core/language/language_mapper.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_config.dart';
 import '../models/emergency_call.dart';
+import 'auth_storage_service.dart';
 
 class EmergencyApiService {
   Uri _endpoint(String baseUrl, String path) => Uri.parse('$baseUrl$path');
@@ -57,6 +58,10 @@ class EmergencyApiService {
   }
 
   Future<http.Response> _sendMultipart(http.MultipartRequest request) async {
+    final token = await AuthStorageService.getAccessToken();
+    if (token != null && token.isNotEmpty && !request.headers.containsKey('Authorization')) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
     final endpoint = _safePath(request.url);
     final stopwatch = Stopwatch()..start();
     var phase = 'send/upload/response-headers';
@@ -90,6 +95,16 @@ class EmergencyApiService {
       );
       throw ApiException('Cannot connect to EmergencyIQ backend.');
     }
+  }
+
+  Future<Map<String, String>> _jsonHeaders({String? idempotencyKey}) async {
+    final token = await AuthStorageService.getAccessToken();
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (idempotencyKey != null && idempotencyKey.isNotEmpty) 'Idempotency-Key': idempotencyKey,
+    };
   }
 
   Future<Map<String, dynamic>> healthCheck() async {
@@ -267,14 +282,11 @@ class EmergencyApiService {
   }) async {
     final baseUrl = await ApiClient.getBaseUrl();
     final uri = _endpoint(baseUrl, ApiConfig.textEmergencyEndpoint);
+    final reqHeaders = await _jsonHeaders(idempotencyKey: idempotencyKey);
     final response = await _request(
       ApiClient.client.post(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: reqHeaders,
         body: jsonEncode({
           'text': text.trim(),
           'language': _validatedLanguage(language),

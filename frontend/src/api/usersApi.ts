@@ -27,10 +27,16 @@ export async function resetUserPassword(id: string, newPassword: string): Promis
   return resp.data
 }
 
+export async function getUserSummary(id: string): Promise<any> {
+  const resp = await axiosClient.get(`/users/${id}/summary`)
+  return resp.data
+}
+
 export default {
   listUsers,
   createUser,
   updateUser,
   listRoles,
   resetUserPassword,
+  getUserSummary,
 }

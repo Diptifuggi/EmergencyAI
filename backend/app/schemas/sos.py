@@ -226,6 +226,8 @@ class SOSStatsResponse(BaseModel):
     active_sos: int
     silent_sos: int
     panic_button: int
+    pending_verification: int = 0
+    trackme_active_now: int = 0
     avg_time_to_acknowledge_seconds: Optional[float] = None
 
 

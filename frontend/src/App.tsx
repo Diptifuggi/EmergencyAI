@@ -27,6 +27,7 @@ import SosAlertsPage from '@/pages/sos/SosAlertsPage'
 import SosDetailPage from '@/pages/sos/SosDetailPage'
 import PublicTrackPage from '@/pages/PublicTrackPage'
 import UnauthorizedPage from '@/pages/UnauthorizedPage'
+import UserDetailPage from '@/pages/users/UserDetailPage'
 
 
 const queryClient = new QueryClient({
@@ -57,6 +58,7 @@ function AppRoutes(){
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="sos" element={<SosAlertsPage />} />
         <Route path="sos/:id" element={<SosDetailPage />} />
+        <Route path="users/:id" element={<UserDetailPage />} />
         <Route path="calls" element={<EmergencyCalls />} />
 
         <Route path="calls/:id" element={<CallViewerPage />} />

@@ -24,7 +24,15 @@ function formatDateTime(dateStr?: string | Date): string {
   if (!dateStr) return '-'
   const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
   if (isNaN(d.getTime())) return '-'
-  return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • ${d.toLocaleDateString([], { day: '2-digit', month: 'short' })}`
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }) + ' IST'
 }
 
 function formatDistanceToNow(dateStr?: string | Date): string {

@@ -10,11 +10,14 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
-from ...core.dependencies import get_current_admin, get_current_citizen, get_current_user
+from ...core.dependencies import get_current_admin, get_current_citizen, get_current_operator, get_current_user
 from ...core.encryption import decrypt_field, encrypt_field
 from ...core.security import hash_password, validate_password_policy
 from ...models.auth_token import RefreshToken
+from ...models.emergency_call import EmergencyCall
 from ...models.emergency_contact import EmergencyContact
+from ...models.sos_alert import SOSAlert
+from ...models.track_session import TrackSession
 from ...models.user import User
 from ...models.user_notification import UserNotification
 from ...models.user_profile import UserProfile
@@ -397,6 +400,127 @@ async def create_user(
         await db.rollback()
         raise HTTPException(status_code=503, detail="User service is temporarily unavailable") from exc
     return AuthService.user_to_schema(user)
+
+@router.get("/{user_id}/summary")
+async def get_user_operator_summary(
+    user_id: UUID,
+    current_user: UserOut = Depends(get_current_operator),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    profile = (
+        await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    ).scalar_one_or_none()
+
+    profile_out = None
+    if profile:
+        profile_out = {
+            "full_name": profile.full_name,
+            "phone": profile.phone,
+            "alternate_phone": profile.alternate_phone,
+            "guardian_phone": profile.guardian_phone,
+            "guardian_relation": profile.guardian_relation,
+            "address": profile.address,
+            "age": profile.age,
+            "blood_group": profile.blood_group or "unknown",
+            "allergies": decrypt_field(profile.allergies) if profile.allergies and profile.medical_consent else None,
+            "medical_history": decrypt_field(profile.medical_history) if profile.medical_history and profile.medical_consent else None,
+            "medical_consent": profile.medical_consent,
+            "medical_consent_at": profile.medical_consent_at.isoformat() if profile.medical_consent_at else None,
+            "profile_completed": profile.profile_completed,
+        }
+
+    contacts = (
+        await db.execute(
+            select(EmergencyContact)
+            .where(EmergencyContact.user_id == user_id)
+            .order_by(EmergencyContact.is_primary.desc(), EmergencyContact.created_at.asc())
+        )
+    ).scalars().all()
+
+    alerts = (
+        await db.execute(
+            select(SOSAlert)
+            .where(SOSAlert.user_id == user_id)
+            .order_by(SOSAlert.received_at.desc())
+            .limit(50)
+        )
+    ).scalars().all()
+
+    calls = (
+        await db.execute(
+            select(EmergencyCall)
+            .where(EmergencyCall.user_id == user_id)
+            .order_by(EmergencyCall.created_at.desc())
+            .limit(50)
+        )
+    ).scalars().all()
+
+    tracks = (
+        await db.execute(
+            select(TrackSession)
+            .where(TrackSession.user_id == user_id)
+            .order_by(TrackSession.started_at.desc())
+            .limit(30)
+        )
+    ).scalars().all()
+
+    record_audit_log(db, current_user, "user_profile_viewed", "user", str(user_id))
+    await db.commit()
+
+    return {
+        "user": AuthService.user_to_schema(user),
+        "profile": profile_out,
+        "emergency_contacts": [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "phone": c.phone,
+                "relation": c.relation,
+                "notify_on_sos": c.notify_on_sos,
+                "is_primary": c.is_primary,
+            }
+            for c in contacts
+        ],
+        "sos_alerts": [
+            {
+                "id": str(a.id),
+                "alert_type": a.alert_type,
+                "service_category": getattr(a, "service_category", "general") or "general",
+                "status": a.status,
+                "received_at": a.received_at.isoformat() if a.received_at else None,
+                "location_status": a.location_status,
+            }
+            for a in alerts
+        ],
+        "reports": [
+            {
+                "id": str(c.id),
+                "call_type": c.call_type,
+                "status": c.status,
+                "priority": c.priority,
+                "text_content": c.text_content,
+                "location_address": c.location_address,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in calls
+        ],
+        "track_sessions": [
+            {
+                "id": str(t.id),
+                "status": t.status,
+                "duration_hours": t.duration_hours,
+                "started_at": t.started_at.isoformat() if t.started_at else None,
+                "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+                "share_token": t.share_token,
+            }
+            for t in tracks
+        ],
+    }
+
 
 @router.get("/{user_id}", response_model=UserOut)
 async def get_user(

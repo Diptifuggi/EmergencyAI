@@ -17,6 +17,7 @@ import {
   TableCell,
 } from '@/components/ui'
 import { getEmergency } from '@/api/emergencyApi'
+import { getUserSummary } from '@/api/usersApi'
 import { normalizeEmergencyCall } from '@/lib/emergencyCallNormalizer'
 import CallerLocationMap from '@/components/CallerLocationMap'
 import Loading from '@/components/common/Loading'
@@ -30,6 +31,11 @@ export default function CallViewerPage() {
     queryFn: () => getEmergency(id as string),
     enabled: Boolean(id),
     refetchInterval: 15000,
+  })
+  const { data: userSummary } = useQuery({
+    queryKey: ['user-summary', emergency?.user_id],
+    queryFn: () => getUserSummary(emergency.user_id),
+    enabled: Boolean(emergency?.user_id),
   })
 
   if (isLoading) return <Loading />
@@ -75,9 +81,9 @@ export default function CallViewerPage() {
   const rawTranscript = normalizedCall.textContent || normalizedCall.transcription || 'Not available'
   const call = {
     id: emergency.id,
-    caller_name: normalizedCall.callerName || 'Not provided',
-    caller_phone: normalizedCall.callerPhone || 'Not provided',
-    caller_email: normalizedCall.callerEmail || 'Not provided',
+    caller_name: userSummary?.profile?.full_name || normalizedCall.callerName || 'Not provided',
+    caller_phone: userSummary?.profile?.phone || normalizedCall.callerPhone || 'Not provided',
+    caller_email: userSummary?.user?.email || normalizedCall.callerEmail || 'Not provided',
     age: metadata.age ?? 'Not available',
     gender: typeof metadata.gender === 'string' && metadata.gender.trim() ? metadata.gender : 'Not available',
     language: normalizedCall.language || 'Not reported',
@@ -184,6 +190,14 @@ export default function CallViewerPage() {
                 <div>
                   <div className="text-zinc-500">Email</div>
                   <div className="font-medium">{call.caller_email}</div>
+                  {emergency.user_id && (
+                    <button
+                      onClick={() => navigate(`/users/${emergency.user_id}`)}
+                      className="mt-1 text-xs text-blue-600 font-semibold hover:underline"
+                    >
+                      View Citizen Profile &amp; History →
+                    </button>
+                  )}
                 </div>
                 <div>
                   <div className="text-zinc-500">Language</div>

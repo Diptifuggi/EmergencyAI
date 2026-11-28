@@ -31,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import BASE_DIR, settings
 from ...core.database import async_session, get_db
-from ...core.dependencies import get_current_operator, get_optional_user
+from ...core.dependencies import get_current_citizen, get_current_operator, get_optional_user
 from ...core.exceptions import FileTooLargeError, InvalidFileTypeError
 from ...core.language import bcp47_language
 from ...core.logger import get_logger
@@ -414,6 +414,7 @@ async def create_text_emergency(
     payload: EmergencyCallTextCreate,
     background_tasks: BackgroundTasks,
     idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
+    current_user: UserOut | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     started_at = time.perf_counter()
@@ -432,6 +433,7 @@ async def create_text_emergency(
         payload.location_address,
     )
     emergency = EmergencyCall(
+        user_id=current_user.id if current_user else None,
         call_type="text",
         text_content=payload.text,
         language=_persisted_language(requested_language),
@@ -553,6 +555,7 @@ async def create_audio_emergency(
     client_metadata: str | None = Form(None),
     map_snapshot: UploadFile | None = File(None),
     idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
+    current_user: UserOut | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """
@@ -699,6 +702,7 @@ async def create_audio_emergency(
         original_audio_filename=original_name,
         audio_content_type=content_type,
         audio_file_size=size_bytes,
+        user_id=current_user.id if current_user else None,
         transcription=cleaned_transcription,
         text_content=cleaned_transcription,
         source=(source or "flutter").strip() or "flutter",
@@ -789,6 +793,7 @@ async def create_voice_and_text_emergency(
     client_metadata: str | None = Form(None),
     map_snapshot: UploadFile | None = File(None),
     idempotency_header: str | None = Header(default=None, alias="Idempotency-Key"),
+    current_user: UserOut | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> EmergencyCall:
     """Requires both audio file and its text. Prefer this from the Flutter app."""
@@ -820,6 +825,7 @@ async def create_voice_and_text_emergency(
     )
 
     emergency = EmergencyCall(
+        user_id=current_user.id if current_user else None,
         call_type="voice_text",
         language=cleaned_language,
         status="analyzing",
@@ -892,6 +898,25 @@ async def create_voice_and_text_emergency(
         has_analyzable_transcript(emergency),
     )
     return emergency
+
+
+@router.get("/mine", response_model=EmergencyCallListOut)
+async def list_my_emergency_calls(
+    current_user: UserOut = Depends(get_current_citizen),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> EmergencyCallListOut:
+    count_stmt = select(func.count()).select_from(EmergencyCall).where(EmergencyCall.user_id == current_user.id)
+    list_stmt = (
+        select(EmergencyCall)
+        .where(EmergencyCall.user_id == current_user.id)
+        .order_by(EmergencyCall.created_at.desc())
+    )
+    total = int((await db.execute(count_stmt)).scalar_one())
+    result = await db.execute(list_stmt.offset(offset).limit(limit))
+    items = list(result.scalars().all())
+    return EmergencyCallListOut(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/", response_model=EmergencyCallListOut)

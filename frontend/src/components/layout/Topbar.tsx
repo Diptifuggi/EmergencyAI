@@ -4,6 +4,7 @@ import { Bell, Search, User, CheckCircle, Menu } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { useQuery } from '@tanstack/react-query'
 import { getEmergencies } from '@/api/emergencyApi'
+import { listSosAlerts } from '@/api/sosApi'
 import { getPriorityConfig } from '@/lib/priorityUtils'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
@@ -47,10 +48,21 @@ export default function Topbar(){
     refetchInterval: 10000,
     retry: false,
   })
-  const critical = callRecords.filter((call) => priorityForCall(call) === 'Critical')
-  const criticalCount = critical.length
+  const { data: pendingSosData } = useQuery({
+    queryKey: ['sos', 'pending-bell'],
+    queryFn: () => listSosAlerts({ status: 'pending', page_size: 20 }),
+    enabled: isAuthenticated,
+    refetchInterval: 5000,
+    retry: false,
+  })
+  const pendingSos = pendingSosData?.items || []
+  const newOrCriticalReports = callRecords.filter(
+    (call) => priorityForCall(call) === 'Critical' || call.status === 'received' || call.status === 'analyzing'
+  )
+  const criticalCount = pendingSos.length + newOrCriticalReports.length
 
   function handleViewCall(id){ navigate(`/calls/${id}`); setSheetOpen(false) }
+  function handleViewSos(id){ navigate(`/sos/${id}`); setSheetOpen(false) }
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4">
@@ -82,33 +94,62 @@ export default function Topbar(){
                   <div className="font-semibold">Critical Alerts</div>
                   <button onClick={()=>setSheetOpen(false)} className="text-sm text-gray-500">Close</button>
                 </div>
-                <div className="p-3">
-                  {(!critical || critical.length === 0) ? (
+                <div className="p-3 max-h-96 overflow-y-auto space-y-3">
+                  {criticalCount === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8">
                       <div className="text-green-600 mb-3"><CheckCircle className="w-8 h-8" /></div>
-                      <div className="font-medium">No active critical calls</div>
+                      <div className="font-medium">No pending SOS or unreviewed reports</div>
                     </div>
                   ) : (
-                    <ul className="space-y-3">
-                      {critical.slice(0,5).map(c => {
-                        const priority = priorityForCall(c)
-                        const analysis = analysisForCall(c)
-                        const metadata = c.client_metadata || {}
-                        const cfg = getPriorityConfig(priority)
-                        return (
-                          <li key={c.id} className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{metadata.caller_name || 'Not available'}</div>
-                              <div className="text-xs text-gray-500">{categoryForCall(c)} • Score: {analysis.priority_score ?? 'Not available'}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="px-2 py-0.5 text-xs rounded" style={{ background: cfg.color + '20', color: cfg.color }}>{cfg.label}</div>
-                              <button onClick={()=>handleViewCall(c.id)} className="text-sm text-blue-600">View</button>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                    <>
+                      {pendingSos.length > 0 && (
+                        <div>
+                          <div className="text-[11px] font-bold uppercase text-red-600 mb-1.5">
+                            Unacknowledged SOS ({pendingSos.length})
+                          </div>
+                          <ul className="space-y-2">
+                            {pendingSos.slice(0, 5).map(s => (
+                              <li key={s.id} className="flex items-center justify-between text-xs bg-red-50 p-2 rounded">
+                                <div>
+                                  <div className="font-semibold text-red-900">
+                                    {s.user_name || 'Citizen'} • {(s.alert_type || 'sos').replace('_', ' ').toUpperCase()}
+                                  </div>
+                                  <div className="text-red-700">Service: {s.service_category || 'general'}</div>
+                                </div>
+                                <button onClick={() => handleViewSos(s.id)} className="text-red-700 font-bold hover:underline">Open</button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {newOrCriticalReports.length > 0 && (
+                        <div>
+                          <div className="text-[11px] font-bold uppercase text-zinc-500 mb-1.5">
+                            New / Critical Reports ({newOrCriticalReports.length})
+                          </div>
+                          <ul className="space-y-2">
+                            {newOrCriticalReports.slice(0, 5).map(c => {
+                              const priority = priorityForCall(c)
+                              const analysis = analysisForCall(c)
+                              const metadata = c.client_metadata || {}
+                              const cfg = getPriorityConfig(priority)
+                              return (
+                                <li key={c.id} className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium text-sm">{metadata.caller_name || 'Citizen Report'}</div>
+                                    <div className="text-xs text-gray-500">{categoryForCall(c)} • {c.status}</div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="px-2 py-0.5 text-xs rounded" style={{ background: cfg.color + '20', color: cfg.color }}>{cfg.label}</div>
+                                    <button onClick={()=>handleViewCall(c.id)} className="text-sm text-blue-600">View</button>
+                                  </div>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

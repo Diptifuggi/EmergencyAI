@@ -31,6 +31,15 @@ class HomeFeatureApiService {
     return getCachedAddress();
   }
 
+  // --- My Voice / Text Emergency Reports ---
+  static Future<Map<String, dynamic>> listMyEmergencyCalls({int limit = 30, int offset = 0}) async {
+    final resp = await AuthHttpClient.get('/api/v1/emergency-calls/mine?limit=$limit&offset=$offset');
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load reports (${resp.statusCode})');
+  }
+
   // --- SOS History (Mine) ---
   static Future<Map<String, dynamic>> listMySosAlerts({int page = 1, int pageSize = 20}) async {
     final resp = await AuthHttpClient.get('/api/v1/sos/mine?page=$page&page_size=$pageSize');

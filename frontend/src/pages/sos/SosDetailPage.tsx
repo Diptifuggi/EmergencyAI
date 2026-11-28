@@ -37,7 +37,15 @@ function formatDateTime(dateStr?: string | Date): string {
   if (!dateStr) return '-'
   const d = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
   if (isNaN(d.getTime())) return '-'
-  return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • ${d.toLocaleDateString([], { day: '2-digit', month: 'short' })}`
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }) + ' IST'
 }
 
 // Custom Leaflet Pulse Marker for SOS
@@ -330,9 +338,19 @@ export default function SosDetailPage() {
             <CardContent className="p-4 space-y-4 text-xs">
               <div>
                 <span className="text-zinc-500">Full Name:</span>
-                <p className="text-sm font-bold text-white mt-0.5">
-                  {snapshot.full_name || snapshot.username || 'Anonymous User'}
-                </p>
+                <div className="flex items-center justify-between gap-2 mt-0.5">
+                  <p className="text-sm font-bold text-white">
+                    {snapshot.full_name || snapshot.username || 'Anonymous User'}
+                  </p>
+                  {alert.user_id && (
+                    <button
+                      onClick={() => navigate(`/users/${alert.user_id}`)}
+                      className="text-[11px] text-blue-400 hover:underline font-medium"
+                    >
+                      View User History →
+                    </button>
+                  )}
+                </div>
               </div>
 
               {snapshot.phone ? (

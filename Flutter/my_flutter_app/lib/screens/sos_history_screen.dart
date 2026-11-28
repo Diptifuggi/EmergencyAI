@@ -11,8 +11,19 @@ class SosHistoryScreen extends StatefulWidget {
   State<SosHistoryScreen> createState() => _SosHistoryScreenState();
 }
 
+String formatIstTime(String? iso) {
+  if (iso == null || iso.isEmpty) return '-';
+  final dt = DateTime.tryParse(iso);
+  if (dt == null) return iso;
+  final ist = dt.toUtc().add(const Duration(hours: 5, minutes: 30));
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(ist.day)}/${two(ist.month)}/${ist.year} ${two(ist.hour)}:${two(ist.minute)} IST';
+}
+
 class _SosHistoryScreenState extends State<SosHistoryScreen> {
   final List<Map<String, dynamic>> _items = [];
+  List<Map<String, dynamic>> _reports = [];
+  int _selectedTab = 0; // 0 = SOS Alerts, 1 = Voice/Text Reports
   bool _loading = true;
   bool _loadingMore = false;
   int _page = 1;
@@ -39,10 +50,18 @@ class _SosHistoryScreenState extends State<SosHistoryScreen> {
     try {
       final data = await HomeFeatureApiService.listMySosAlerts(page: _page, pageSize: 20);
       final list = (data['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+      List<Map<String, dynamic>> reportList = _reports;
+      if (refresh) {
+        try {
+          final rData = await HomeFeatureApiService.listMyEmergencyCalls(limit: 30);
+          reportList = (rData['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         if (refresh) _items.clear();
         _items.addAll(list);
+        _reports = reportList;
         _total = (data['total'] as num?)?.toInt() ?? _items.length;
         _loading = false;
         _loadingMore = false;
@@ -84,7 +103,23 @@ class _SosHistoryScreenState extends State<SosHistoryScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.sosHistoryTitle)),
+      appBar: AppBar(
+        title: Text(l10n.sosHistoryTitle),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 0, label: Text('SOS Alerts')),
+                ButtonSegment(value: 1, label: Text('Voice / Text Reports')),
+              ],
+              selected: {_selectedTab},
+              onSelectionChanged: (s) => setState(() => _selectedTab = s.first),
+            ),
+          ),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -100,7 +135,34 @@ class _SosHistoryScreenState extends State<SosHistoryScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: () => _load(refresh: true),
-                  child: _items.isEmpty
+                  child: _selectedTab == 1
+                      ? (_reports.isEmpty
+                          ? ListView(
+                              children: const [
+                                SizedBox(height: 120),
+                                Center(child: Text('No voice or text reports sent yet.')),
+                              ],
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(12),
+                              itemCount: _reports.length,
+                              itemBuilder: (ctx, i) {
+                                final r = _reports[i];
+                                final text = (r['text_content'] ?? r['transcription'] ?? 'Voice Report').toString();
+                                final status = (r['status'] ?? 'received').toString().toUpperCase();
+                                final timeIst = formatIstTime(r['created_at']?.toString());
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  child: ListTile(
+                                    leading: const Icon(Icons.assignment_outlined, color: Colors.blue),
+                                    title: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    subtitle: Text('$timeIst\nStatus: $status'),
+                                    isThreeLine: true,
+                                  ),
+                                );
+                              },
+                            ))
+                      : _items.isEmpty
                       ? ListView(
                           children: [
                             const SizedBox(height: 120),
@@ -126,10 +188,7 @@ class _SosHistoryScreenState extends State<SosHistoryScreen> {
                             final type = item['alert_type']?.toString() ?? 'sos';
                             final cat = (item['service_category']?.toString() ?? 'general').toUpperCase();
                             final status = (item['status']?.toString() ?? 'pending').toUpperCase();
-                            final timeStr = item['received_at']?.toString() ?? '';
-                            final formattedTime = timeStr.length >= 16
-                                ? timeStr.substring(0, 16).replaceAll('T', ' ')
-                                : timeStr;
+                            final formattedTime = formatIstTime(item['received_at']?.toString());
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 10),

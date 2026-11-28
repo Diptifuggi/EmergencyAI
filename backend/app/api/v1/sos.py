@@ -24,6 +24,7 @@ from ...models.sos_alert import (
     SOSProfileAccessLog,
     SOSStatus,
 )
+from ...models.track_session import TrackSession, TrackSessionStatus
 from ...models.user import User
 from ...models.user_notification import UserNotification
 from ...models.user_profile import UserProfile
@@ -400,6 +401,18 @@ async def get_sos_stats(
     )
     panic_count = (await db.execute(panic_q)).scalar() or 0
 
+    pending_ver_q = select(func.count(SOSAlert.id)).where(
+        SOSAlert.status.in_([SOSStatus.PENDING.value, SOSStatus.ACKNOWLEDGED.value]),
+    )
+    pending_ver_count = (await db.execute(pending_ver_q)).scalar() or 0
+
+    now = datetime.now(timezone.utc)
+    trackme_q = select(func.count(TrackSession.id)).where(
+        TrackSession.status == TrackSessionStatus.ACTIVE.value,
+        TrackSession.expires_at > now,
+    )
+    trackme_active_count = (await db.execute(trackme_q)).scalar() or 0
+
     ack_alerts_stmt = select(SOSAlert.received_at, SOSAlert.acknowledged_at).where(
         SOSAlert.acknowledged_at.is_not(None)
     )
@@ -418,6 +431,8 @@ async def get_sos_stats(
         active_sos=active_count,
         silent_sos=silent_count,
         panic_button=panic_count,
+        pending_verification=pending_ver_count,
+        trackme_active_now=trackme_active_count,
         avg_time_to_acknowledge_seconds=round(avg_ack_seconds, 1) if avg_ack_seconds is not None else None,
     )
 

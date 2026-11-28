@@ -1,14 +1,46 @@
 // @ts-nocheck
-import { format, formatDistanceToNow } from 'date-fns'
+
+export function formatIST(iso?: string | null): string {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '—'
+    return (
+      d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      }) + ' IST'
+    )
+  } catch {
+    return iso
+  }
+}
 
 export function formatDate(iso?: string | null): string {
-  if (!iso) return '—'
-  try { return format(new Date(iso), 'dd LLL yyyy, HH:mm') } catch { return iso }
+  return formatIST(iso)
 }
 
 export function formatDateAgo(iso?: string | null): string {
   if (!iso) return '—'
-  try { return formatDistanceToNow(new Date(iso), { addSuffix: true }) } catch { return '—' }
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return '—'
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000)
+    if (diffSec < 60) return `${diffSec}s ago`
+    const diffMin = Math.floor(diffSec / 60)
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHr = Math.floor(diffMin / 60)
+    if (diffHr < 24) return `${diffHr}h ago`
+    return `${Math.floor(diffHr / 24)}d ago`
+  } catch {
+    return '—'
+  }
 }
 
 export function formatUUID(uuid?: string | null): string {
